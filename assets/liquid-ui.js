@@ -111,8 +111,8 @@
   // ---------- rubber band and bounce, as in iOS ----------
   // UIScrollView rubber band: f(x) = (1 − 1 / (x*c/d + 1))*d, c = 0.55. The further you pull, the stiffer; limit d.
   const RUBBER_C = 0.55;
-  const rubber = (x, d) => Math.sign(x) * (1 - 1 / ((Math.abs(x) * RUBBER_C) / d + 1)) * d;
-  const rubberInv = (f, d) => { const a = Math.min(Math.abs(f), d * 0.999); return Math.sign(f) * (d / RUBBER_C) * (a / (d - a)); };
+  const rubber = (x, d) => (d < 0.5 ? 0 : Math.sign(x) * (1 - 1 / ((Math.abs(x) * RUBBER_C) / d + 1)) * d);
+  const rubberInv = (f, d) => { if (d < 0.5) return 0; const a = Math.min(Math.abs(f), d * 0.999); return Math.sign(f) * (d / RUBBER_C) * (a / (d - a)); };
   // bounce after release: a soft underdamped spring, about 15% overshoot, settles in about 0.6 s.
   // A stiff spring (300 and up) on a large stretch looks like a snap with no animation.
   const BOUNCE = spring(0.5, 170, 0.05);
@@ -561,7 +561,7 @@
     const offset = new Anim(0, () => invalidate(render));
     // pull past the edge tab (px, sign = side): the panel stretches on a rubber band and bounces
     const pull = new Anim(0, () => invalidate(render)), pullVT = new VelocityTracker();
-    let raw = 0;
+    let raw = 0, roomL = 24, roomR = 24;
     const glow = new PressGlow(() => invalidate(render));
     const geo = () => { const W = sizeOf(el).cw; return { W, tw: (W - 8) / n }; };
     // how much the item inside the drop may grow: the label must fit the flat part of the lens
@@ -628,7 +628,13 @@
         const onSel = x >= 4 + dd.value * tw - 6 && x <= 4 + (dd.value + 1) * tw + 6;
         dd.press(); glow.down(0, 0);
         if (!onSel) dd.updateValue(clamp((x - 4) / tw - 0.5, 0, n - 1));
-        raw = dd.targetValue + rubberInv(pull.value, 24) / tw;
+        // Room to pull past each end: the stretched panel and the drop (wider than a tab) must stay on screen,
+        // otherwise the screen edge cuts them with a straight line. A bar flush with the screen does not stretch.
+        const r = el.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+        const over = (tw * ((dd.pressedScaleX || 1) - 1)) / 2 - 4; // how far the pressed drop sticks out past the panel end
+        const room = (gap) => clamp(Math.min(gap - 2, (gap - 2 - over) / 0.9), 0, 24);
+        roomL = room(r.left); roomR = room(vw - r.right);
+        raw = dd.targetValue + rubberInv(pull.value, pull.value < 0 ? roomL : roomR) / tw;
         pull.snapTo(pull.value); pullVT.reset();
       },
       move: (e, dx) => {
@@ -636,7 +642,8 @@
         raw += dx / tw;
         dd.updateValue(clamp(raw, 0, n - 1));
         offset.snapTo(offset.value + dx);
-        if (!reduceMotion()) pull.snapTo(rubber((raw - clamp(raw, 0, n - 1)) * tw, 24));
+        const past = (raw - clamp(raw, 0, n - 1)) * tw;
+        if (!reduceMotion()) pull.snapTo(rubber(past, past < 0 ? roomL : roomR));
         pullVT.add(performance.now(), pull.value);
       },
       up: () => {

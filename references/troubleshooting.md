@@ -16,6 +16,7 @@
 | Thumb ignores the finger | the container lacks `touch-action: none`, or an overlapping element sits on top |
 | Dirty rainbow smears above and below the drop, stretched letters at its edges | the lens samples inward; it needs `overscan` (already set in `tabs`) |
 | Drop at the screen edge is black or shows a foreign piece of backdrop | an element with `backdrop-filter` enlarged by transform crossed the screen edge; use `overscan`, the engine clips the layer itself |
+| A pulled button, merge group or drop shows a straight cut edge or a thin coloured line | it left the box of its `position: fixed` container; give the container transparent padding on that side and anchor it to the screen edge (`web.md`) |
 | Mirrored pieces of the bar inside the drop above the bar | the bar is in a `position: fixed` container and the lens left its bounds; transparent `padding-top` on the container |
 | Muddy grey mix inside the drop instead of the item | the drop lies directly on the panel; it needs a row copy and a window in the panel, as in `tabs` |
 | On a phone the button does not stretch and releases at once | the browser took the scroll gesture: check `touch-action`, call `LiquidUI.refreshTouch()` after screen changes |

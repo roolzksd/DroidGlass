@@ -31,8 +31,11 @@
   .line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
   #mag { position: absolute; left: 0; top: 0; width: 128px; height: 96px; }
   .note { font-size: 13px; color: var(--muted); }
-  #dock { position: fixed; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 12px; align-items: flex-end;
-    padding-top: 64px; pointer-events: none; max-width: 460px; margin: 0 auto; }
+  /* Chrome gives backdrop-filter inside a position: fixed container only within the container's box. So the
+     dock spans the whole width with transparent padding: the drop and pulled buttons stay inside it and never
+     get a visible cut edge. pointer-events: none lets clicks through the padding. */
+  #dock { position: fixed; left: 0; right: 0; bottom: 0; box-sizing: border-box; display: flex; gap: 12px; align-items: flex-end;
+    padding: 72px max(12px, calc(50vw - 230px)) 12px; pointer-events: none; }
   #dock > * { pointer-events: auto; }
   #tabs { flex: 1; }
   #fab { width: 64px; height: 64px; flex: none; border: 0; background: none; color: var(--ink); font: 500 30px/1 Inter, system-ui, sans-serif; }
