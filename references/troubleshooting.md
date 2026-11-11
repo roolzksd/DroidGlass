@@ -12,6 +12,7 @@
 | Stair steps on the rim | `resolution: 2` |
 | Scrolling or pressing stutters | count the expanded filter tree (`performance.md`): a heavy step under a result read by several steps; then fewer glass elements, `sleep` for invisible ones |
 | Element is a hole in Safari | someone set `backdrop-filter: url()` without checking the engine; use `attach` |
+| Slider or toggle freezes when the mouse leaves it, or the thumb lags behind the cursor after hitting an end | an old `gesture()` that relied only on pointer capture and added up deltas; the current one also listens on `window` and maps from the press point |
 | Thumb ignores the finger | the container lacks `touch-action: none`, or an overlapping element sits on top |
 | Dirty rainbow smears above and below the drop, stretched letters at its edges | the lens samples inward; it needs `overscan` (already set in `tabs`) |
 | Drop at the screen edge is black or shows a foreign piece of backdrop | an element with `backdrop-filter` enlarged by transform crossed the screen edge; use `overscan`, the engine clips the layer itself |

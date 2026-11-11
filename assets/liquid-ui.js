@@ -228,30 +228,46 @@
     get oy() { return this.y.value - this.sy; }
   }
 
-  // gesture with pointer capture; coordinates in the element's space without its transform
+  // gesture with pointer capture; coordinates in the element's space without its transform.
+  // Move/up are also tracked on window while the gesture is active: if pointer capture is unavailable
+  // (some embedded webviews) or lost, a mouse that leaves the element would otherwise freeze the drag.
   function gesture(el, h) {
     let id = null, lx = 0, ly = 0;
     const local = (e) => {
       const r = el.getBoundingClientRect(), kx = r.width / (el.offsetWidth || 1), ky = r.height / (el.offsetHeight || 1);
       return [(e.clientX - r.left) / kx, (e.clientY - r.top) / ky];
     };
-    const onDown = (e) => {
-      if (id !== null || e.button > 0) return;
-      id = e.pointerId; lx = e.clientX; ly = e.clientY;
-      try { el.setPointerCapture(id); } catch (_) {}
-      h.down && h.down(e, local(e));
-    };
     const onMove = (e) => {
       if (e.pointerId !== id) return;
       const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+      if (dx === 0 && dy === 0) return;
       h.move && h.move(e, dx, dy, local(e));
     };
-    const onUp = (e) => { if (e.pointerId !== id) return; id = null; h.up && h.up(e, e.type === 'pointercancel'); };
+    const end = (e, cancel) => {
+      if (id === null || (e && e.pointerId !== id)) return;
+      id = null;
+      root.removeEventListener('pointermove', onMove, true);
+      root.removeEventListener('pointerup', onUp, true);
+      root.removeEventListener('pointercancel', onCancel, true);
+      h.up && h.up(e, cancel);
+    };
+    const onUp = (e) => end(e, false);
+    const onCancel = (e) => end(e, true);
+    // capture lost without pointerup (element removed, capture refused): finish on the next up anywhere
+    const onLost = (e) => { if (e.pointerId === id && e.buttons === 0) end(e, false); };
+    const onDown = (e) => {
+      if (id !== null || e.button > 0) return;
+      id = e.pointerId; lx = e.clientX; ly = e.clientY;
+      if (e.pointerType === 'mouse') e.preventDefault(); // no text selection or native drag from a mouse press
+      try { el.setPointerCapture(id); } catch (_) {}
+      root.addEventListener('pointermove', onMove, true);
+      root.addEventListener('pointerup', onUp, true);
+      root.addEventListener('pointercancel', onCancel, true);
+      h.down && h.down(e, local(e));
+    };
     el.addEventListener('pointerdown', onDown);
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
-    el.addEventListener('pointercancel', onUp);
-    return () => { el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp); };
+    el.addEventListener('lostpointercapture', onLost);
+    return () => { end(null, true); el.removeEventListener('pointerdown', onDown); el.removeEventListener('lostpointercapture', onLost); };
   }
 
   // EaseOut Compose = CubicBezier(0, 0, 0.58, 1)
@@ -400,7 +416,7 @@
     el.innerHTML = '<div class="lgu-track"></div><div class="lgu-knob"></div>';
     const track = el.firstChild, knob = el.lastChild;
     const g = knobGlass(knob, 5, 10);
-    let checked = !!o.checked, fraction = checked ? 1 : 0, didDrag = false;
+    let checked = !!o.checked, fraction = checked ? 1 : 0, didDrag = false, f0 = 0, x0 = 0;
     const dd = new DampedDrag({ value: fraction, min: 0, max: 1, threshold: 0.001, pressedScale: 1.5, onChange: () => invalidate(render) });
     function render() {
       const v = dd.value;
@@ -410,10 +426,11 @@
     }
     const commit = (c) => { if (c !== checked) { checked = c; if (o.onChange) o.onChange(c); } invalidate(render); };
     const off = gesture(el, {
-      down: () => { didDrag = false; dd.press(); },
-      move: (e, dx) => {
+      down: (e, [x]) => { didDrag = false; f0 = fraction; x0 = x; dd.press(); },
+      move: (e, dx, dy, [x]) => {
         if (dx !== 0) didDrag = true;
-        fraction = clamp(fraction + dx / 20, 0, 1);
+        // absolute from the press point: the thumb stays under the pointer even after overshooting an end
+        fraction = clamp(f0 + (x - x0) / 20, 0, 1);
         dd.updateValue(fraction);
       },
       up: () => {
@@ -445,7 +462,7 @@
     const g = knobGlass(knob, 10, 14);
     const range = o.max - o.min;
     const dd = new DampedDrag({ value: o.value, min: o.min, max: o.max, threshold: range / 1000, pressedScale: 1.5, onChange: () => invalidate(render) });
-    let mode = null, didDrag = false, sx0 = 0;
+    let mode = null, didDrag = false, sx0 = 0, v0 = 0, dx0 = 0;
     function render() {
       const W = sizeOf(el).cw, kw = sizeOf(knob).w, pr = clamp(dd.progress, 0, 1);
       rail.style.background = THEME.track();
@@ -460,13 +477,15 @@
         const W = el.clientWidth, kw = knob.offsetWidth, kx = clamp(-kw / 2 + W * dd.progress, -kw / 4, W - (kw * 3) / 4) + kw / 2;
         didDrag = false; sx0 = x;
         mode = Math.abs(x - kx) < knob.offsetWidth * 0.75 ? 'drag' : 'tap';
+        v0 = dd.targetValue; dx0 = x;
         if (mode === 'drag') dd.press();
       },
       move: (e, dx, dy, [x]) => {
         if (mode === 'tap' && Math.abs(x - sx0) > 6) { mode = 'drag'; dd.press(); }
         if (mode !== 'drag') return;
         if (dx !== 0) didDrag = true;
-        const v = clamp(dd.targetValue + (range * dx) / el.clientWidth, o.min, o.max);
+        // absolute from the press point: the thumb stays under the pointer, also after overshooting an end
+        const v = clamp(v0 + (range * (x - dx0)) / el.clientWidth, o.min, o.max);
         dd.updateValue(v); emit(v, false);
       },
       up: (e, cancel) => {
