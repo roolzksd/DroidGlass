@@ -1,0 +1,80 @@
+/* DroidGlass (liquid-glass.css). The glass is transparent: the filter, the rim highlight (canvas) and shadows make it glass. */
+/* offset and scale change every frame; without inheritance Chrome does not recalc styles of all nested elements */
+@property --lg-tx { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --lg-ty { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --lg-sx { syntax: '<number>'; inherits: false; initial-value: 1; }
+@property --lg-sy { syntax: '<number>'; inherits: false; initial-value: 1; }
+.lg {
+  --lg-base: translate(0, 0);   /* put the element's own transform here, e.g. translateX(-50%) */
+  --lg-tx: 0px; --lg-ty: 0px; --lg-sx: 1; --lg-sy: 1;
+  --lg-press: 0; --lg-px: 50%; --lg-py: 50%; --lg-glow: 96px;
+  position: relative;
+  isolation: isolate;
+  transform: var(--lg-base) translate(var(--lg-tx), var(--lg-ty)) scale(var(--lg-sx), var(--lg-sy));
+  -webkit-tap-highlight-color: transparent;
+}
+/* rim highlight: drawn by the engine into a canvas over the content, like Highlight in Backdrop */
+.lg > .lg-hl {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: inherit; pointer-events: none; z-index: 1;
+}
+/* lens layer with overscan: a sibling before the element; the engine sets its size and position, no transform */
+.lg-lens { position: absolute; pointer-events: none; }
+/* glow under the finger (InteractiveHighlight): +8% white over the area and a spot of radius 1.5 x the short side */
+.lg::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(circle var(--lg-glow) at var(--lg-px) var(--lg-py),
+      rgb(255 255 255 / .15) 50%, rgb(255 255 255 / .127) 62.5%, rgb(255 255 255 / .075) 75%,
+      rgb(255 255 255 / .023) 87.5%, rgb(255 255 255 / 0) 100%),
+    linear-gradient(rgb(255 255 255 / .08), rgb(255 255 255 / .08));
+  opacity: var(--lg-press);
+  mix-blend-mode: plus-lighter;
+}
+/* accessibility */
+.lg--contrast { background: rgb(255 255 255 / .9) !important; outline: 1px solid rgb(0 0 0 / .5); }
+@media (prefers-color-scheme: dark) { .lg--contrast { background: rgb(18 18 20 / .92) !important; outline-color: rgb(255 255 255 / .6); } }
+@media (prefers-reduced-transparency: reduce) {
+  .lg { background: rgb(242 242 247 / .96) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) { .lg { background: rgb(28 28 30 / .96) !important; } }
+
+/* ---------- components (liquid-ui.js) ---------- */
+.lgu-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; padding: 0 16px; border: 0; font: inherit; font-size: 15px; color: inherit;
+  cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.lgu-button:focus-visible { outline: 2px solid #0088ff; outline-offset: 3px; }
+
+.lgu-toggle { position: relative; width: 64px; height: 28px; flex: none; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lgu-toggle .lgu-track { position: absolute; inset: 0; border-radius: 999px; }
+.lgu-toggle .lgu-knob { position: absolute; left: 0; top: 2px; width: 40px; height: 24px; }
+.lgu-toggle:focus-visible, .lgu-slider:focus-visible { outline: 2px solid #0088ff; outline-offset: 4px; border-radius: 999px; }
+
+.lgu-slider { position: relative; height: 24px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.lgu-slider .lgu-rail { position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 999px; overflow: hidden; }
+.lgu-slider .lgu-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+.lgu-slider .lgu-knob { position: absolute; left: 0; top: 0; width: 40px; height: 24px; }
+
+.lgu-tabs { position: relative; height: 64px; user-select: none; -webkit-user-select: none; touch-action: none; }
+.lgu-tabs-panel { position: absolute; inset: 0; padding: 4px; box-sizing: border-box; }
+.lgu-tabs-row, .lgu-tabs-accent { display: flex; height: 56px; }
+.lgu-tabs-accent { position: absolute; left: 4px; right: 4px; top: 4px; pointer-events: none; }
+.lgu-tab {
+  flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; background: none; padding: 0; font: inherit; font-size: 11px; font-weight: 600; color: inherit;
+  border-radius: 999px; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.lgu-tab > * { transform: scale(var(--lgu-tab-scale, 1)); }
+.lgu-tab svg { width: 26px; height: 26px; display: block; }
+.lgu-tab:focus-visible { outline: 2px solid #0088ff; outline-offset: -4px; }
+.lgu-tabs-sel { position: absolute; left: 4px; top: 4px; height: 56px; touch-action: none; cursor: grab; }
+
+.lgu-magnifier { position: absolute; left: 0; top: 0; width: 128px; height: 96px; touch-action: none; cursor: grab; }
+
+/* merging glass group layer (LiquidGlass.group): under the members, its filter draws everything */
+.lg-group { position: absolute; pointer-events: none; }
+/* a group layer built after the first frame fades in. Opacity is on the layer itself, not an ancestor, so the glass keeps its backdrop */
+.lg-group.lg-in { animation: lgIn .22s ease-out; }
+@keyframes lgIn { from { opacity: 0; } }

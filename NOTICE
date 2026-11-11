@@ -1,0 +1,20 @@
+DroidGlass
+Copyright 2026 DroidGlass contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The web engine (assets/liquid-glass.js, assets/liquid-ui.js, assets/liquid-glass.css)
+ports formulas, component recipes and spring constants from:
+
+  AndroidLiquidGlass / Backdrop by Kyant
+  https://github.com/Kyant0/AndroidLiquidGlass
+  Licensed under the Apache License, Version 2.0
+
+The merging-glass scheme in LiquidGlass.group follows the approach of:
+
+  Liquid Glass Studio by Charles Yin (iyinchao)
+  https://github.com/iyinchao/liquid-glass-studio
+  Copyright (c) 2024 Charles Yin, licensed under the MIT License
+
+Apple, iOS, macOS and SwiftUI are trademarks of Apple Inc. This project is not
+affiliated with or endorsed by Apple.
