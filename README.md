@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dimasolodovnikov2000-arch.github.io/DroidGlass/assets/demo.html"><b>Live demo</b></a> ·
+  <a href="https://roolzksd.github.io/DroidGlass/assets/demo.html"><b>Live demo</b></a> ·
   <a href="#install">Install</a> ·
   <a href="#what-you-get">What you get</a> ·
   <a href="SKILL.md">SKILL.md</a>
@@ -46,36 +46,36 @@ DroidGlass follows the open [Agent Skills](https://agentskills.io) format: a fol
 **Any agent, one command** (uses the [`skills`](https://github.com/vercel-labs/skills) CLI, Node 22+):
 
 ```bash
-npx skills add dimasolodovnikov2000-arch/DroidGlass
+npx skills add roolzksd/DroidGlass
 ```
 
 **Claude Code**
 
 ```bash
 # for all your projects
-git clone https://github.com/dimasolodovnikov2000-arch/DroidGlass ~/.claude/skills/droidglass
+git clone https://github.com/roolzksd/DroidGlass ~/.claude/skills/droidglass
 # or for one project
-git clone https://github.com/dimasolodovnikov2000-arch/DroidGlass .claude/skills/droidglass
+git clone https://github.com/roolzksd/DroidGlass .claude/skills/droidglass
 ```
 
 **Codex**
 
 ```bash
-git clone https://github.com/dimasolodovnikov2000-arch/DroidGlass ~/.agents/skills/droidglass
+git clone https://github.com/roolzksd/DroidGlass ~/.agents/skills/droidglass
 # or inside a repository: .agents/skills/droidglass
 ```
 
 **Cursor**
 
 ```bash
-git clone https://github.com/dimasolodovnikov2000-arch/DroidGlass .cursor/skills/droidglass
+git clone https://github.com/roolzksd/DroidGlass .cursor/skills/droidglass
 # Cursor also reads .agents/skills, .claude/skills and .codex/skills
 ```
 
 **DeepSeek Harness**
 
 ```bash
-git clone https://github.com/dimasolodovnikov2000-arch/DroidGlass .dsh/skills/droidglass
+git clone https://github.com/roolzksd/DroidGlass .dsh/skills/droidglass
 # or the shared folder: .agents/skills/droidglass
 ```
 
