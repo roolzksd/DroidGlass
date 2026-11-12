@@ -26,6 +26,8 @@
 | Glass buttons darken or flicker while a screen enters | an ancestor of the glass has `opacity` below 1 during the animation (or `filter`, `mask`, `clip-path`): such an ancestor cuts the glass off its backdrop. Move the screen with `transform` and reveal it with a veil on top |
 | After a transition the group glass drifted away from its buttons | the group container is not positioned and an ancestor had a `transform` during the animation; the engine sets `position: relative` itself, in an old copy set it by hand |
 | On a white page the glass looks like a flat white pill | the white highlight has nothing to shine on: `depth: 1` on single glass, `shade` on a group |
+| Merged buttons or drops vanish in Safari or Firefox | an old engine ghosted the members and drew them with an SVG filter those browsers ignore; the current `group` and `blob` fall back to per-member frosted glass |
+| A list of sliders or toggles cannot be scrolled on a phone | their `touch-action: none` takes every gesture; in a scrolling list set `touch-action: pan-y` on them, horizontal drags still work |
 | Bar labels get lost over bright spots | a page-coloured `veil`, 0.2 to 0.25; the glass stays transparent |
 | Glass looks tinted or dirty on a light page | an extra `surface` or tint; the glass is colourless and the backdrop gives the colour, only the primary action is tinted |
 | A button pulled far away and released still fires | the click was not swallowed: pointer capture delivers it to the element even far from it |

@@ -691,8 +691,36 @@
     resolution: 0.25,  // density of field pictures: they are smooth and sent to the compositor every frame
   };
 
+  // Safari, Firefox and reduced transparency: no SVG filter in backdrop-filter, so no merging. Each member gets
+  // plain frosted glass of its own (a hairline rim and a soft shadow) instead of an invisible filter layer.
+  function fallbackGroup(o) {
+    const saved = new Map(), reduced = mq('(prefers-reduced-transparency: reduce)');
+    const paint = (el, r) => {
+      if (!saved.has(el)) saved.set(el, el.getAttribute('style'));
+      const blur = `blur(${Math.max(6, o.blur * 6).toFixed(1)}px) saturate(${Math.round(o.saturation * 140)}%)`;
+      Object.assign(el.style, {
+        borderRadius: r === 'capsule' || r == null ? '9999px' : r + 'px',
+        background: reduced ? (mq('(prefers-color-scheme: dark)') ? 'rgb(44 44 46 / .94)' : 'rgb(242 242 247 / .94)') : 'rgb(255 255 255 / .1)',
+        boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / .38), inset 0 1px 1px rgb(255 255 255 / .35), 0 6px 22px rgb(0 0 0 / .16)',
+        backdropFilter: reduced ? 'none' : blur, webkitBackdropFilter: reduced ? 'none' : blur,
+      });
+    };
+    const restore = (el) => { const v = saved.get(el); if (v == null) el.removeAttribute('style'); else el.setAttribute('style', v); saved.delete(el); };
+    const radii = new Map();
+    const api = {
+      fallback: true,
+      add(el, mo = {}) { radii.set(el, mo.radius ?? 'capsule'); paint(el, radii.get(el)); return api; },
+      remove(el) { if (saved.has(el)) restore(el); radii.delete(el); return api; },
+      update() {}, rebuild() {},
+      set(p) { Object.assign(o, p); for (const [el, r] of radii) paint(el, r); },
+      destroy() { for (const el of [...saved.keys()]) restore(el); radii.clear(); },
+    };
+    return api;
+  }
+
   function group(container, opts) {
     const o = Object.assign({}, GROUP_DEFAULTS, opts);
+    if (!canRefract() || mq('(prefers-reduced-transparency: reduce)')) return fallbackGroup(o);
     const id = 'lgg-' + ++uid;
     const layer = document.createElement('div');
     layer.className = 'lg-group';

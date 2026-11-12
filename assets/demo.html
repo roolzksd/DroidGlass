@@ -39,6 +39,10 @@
   .stage { position: relative; overflow: hidden; isolation: isolate; min-height: 0; }
   body.immersive .top, body.immersive .side { display: none; }
   body.immersive .layout { grid-template-columns: 1fr; height: 100dvh; }
+  @media (max-width: 380px) {
+    .top { gap: 6px; padding: 0 10px; } .brand { font-size: 16px; gap: 8px; } .badge { padding: 4px 7px; font-size: 11px; }
+    .gbtn { padding: 0 14px; font-size: 15px; }
+  }
   @media (max-width: 899px) {
     .layout { grid-template-columns: 1fr; height: auto; }
     .stage { height: calc(100svh - var(--head)); min-height: 560px; order: -1; }
@@ -70,11 +74,13 @@
   .copy { position: absolute; top: 8px; right: 8px; border: 0; border-radius: 8px; padding: 5px 9px; background: rgb(255 255 255 / .1); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
   .try { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
   .try li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; font-size: 14px; }
+  .try strong { font-weight: 700; }
   .try b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--chip); font-size: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   td { padding: 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; } td:last-child { text-align: right; color: var(--muted); }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 13px; color: var(--muted); align-items: center; }
   .foot { font-size: 12px; color: var(--muted); }
+  .note-warn { font-size: 13px; padding: 10px 12px; border-radius: 10px; background: rgb(255 170 0 / .14); color: var(--ink) !important; }
   @media (hover: none) and (pointer: coarse) { .keys-sec { display: none; } }
 
   /* ---------- stage backdrops: real elements, so backdrop-filter sees them ---------- */
@@ -140,6 +146,8 @@
   .stage[data-scene="Poster"] .gbtn:not(.primary), .stage[data-scene="Paper"] .gbtn:not(.primary),
   .stage[data-scene="Poster"] #lens, .stage[data-scene="Paper"] #lens { color: #10131C; text-shadow: none; }
   .gbtn, #lens { transition: color .3s; }
+  .exit { position: absolute; top: 14px; right: 14px; z-index: 5; display: none; background: rgb(8 10 20 / .55); color: #fff; }
+  body.immersive .exit { display: inline-flex; }
   #mag { position: absolute; left: 0; top: 0; width: 128px; height: 96px; z-index: 2; }
   @media (max-width: 899px) {
     .hud { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; padding: 16px 16px 0; gap: 10px 12px; }
@@ -150,7 +158,10 @@
     .pond { width: min(44vw, 340px); height: min(36vw, 260px); }
   }
   @media (max-width: 599px) {
-    .hud { grid-template-columns: 1fr; grid-template-rows: auto auto auto 1fr auto; grid-template-areas: "ctl" "lens" "merge" "." "dock"; }
+    /* phones: the stage grows with its content instead of cutting the tab bar off on short screens */
+    .stage { height: auto; min-height: calc(100svh - var(--head)); }
+    body.immersive .stage { height: auto; min-height: 100svh; }
+    .hud { position: relative; min-height: inherit; grid-template-columns: 1fr; grid-template-rows: auto auto auto minmax(112px, 1fr) auto; grid-template-areas: "ctl" "lens" "merge" "." "dock"; }
     #lens { width: min(78vw, 300px); height: 130px; }
     .pond { width: min(78vw, 300px); height: 150px; }
   }
@@ -161,7 +172,7 @@
   <div class="brand"><i></i>DroidGlass</div>
   <span class="badge" id="engine">checking…</span>
   <span class="badge hide-s" id="fps" title="Frames per second">– fps</span>
-  <button class="ibtn" id="theme" title="Theme (T)" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg></button>
+  <button class="ibtn" id="theme" title="Theme (T)" aria-label="Switch theme"></button>
   <button class="ibtn" id="full" title="Full screen (F)" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   <a class="ibtn hide-s" href="https://github.com/roolzksd/DroidGlass"><svg viewBox="0 0 24 24"><path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.5 11.5 0 0 0-6 0C6.8 2.3 5.8 2.6 5.8 2.6a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.4 9c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>GitHub</a>
 </header>
@@ -198,10 +209,10 @@
     <section>
       <h2>What to try</h2>
       <ul class="try">
-        <li><b>1</b><span>Pull <b style="all:unset;font-weight:700">Share</b> toward <b style="all:unset;font-weight:700">Save</b>: they melt into one drop, then spring apart on release.</span></li>
+        <li><b>1</b><span>Pull <strong>Share</strong> toward <strong>Save</strong>: they melt into one drop, then spring apart on release.</span></li>
         <li><b>2</b><span>Hold a tab and slide along the bar. Past the last tab the bar stretches toward the round button.</span></li>
         <li><b>3</b><span>Grab the toggle or slider thumb: at rest it is a white pill, pressed it turns into a lens.</span></li>
-        <li><b>4</b><span>Drag the small capsule, the magnifier, over the <b style="all:unset;font-weight:700">Poster</b> text.</span></li>
+        <li><b>4</b><span>Drag the small capsule, the magnifier, over the <strong>Poster</strong> text.</span></li>
         <li><b>5</b><span>Open this page in Safari or Firefox to see the fallback: soft blur, same highlights and springs.</span></li>
       </ul>
     </section>
@@ -265,7 +276,7 @@
         </div>
       </div>
       <div class="lens-slot">
-        <div id="lens"><div>Drag me<small>tune it in Lens lab</small></div></div>
+        <div id="lens"><div>Drag me<small>tune it in Lens lab · double-click to put back</small></div></div>
         <span class="tag">LiquidGlass.attach</span>
       </div>
       <div class="merge-slot">
@@ -285,6 +296,7 @@
       </div>
     </div>
     <div id="mag" aria-label="Magnifier"></div>
+    <button class="ibtn exit" id="exit" aria-label="Exit full screen"><svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>Exit</button>
   </main>
 </div>
 
@@ -302,13 +314,27 @@
   const eng = $('engine');
   if (LiquidGlass.canRefract()) { eng.textContent = 'refraction on'; eng.className = 'badge ok'; eng.title = 'Chromium: SVG filters inside backdrop-filter work'; }
   else { eng.textContent = 'blur fallback'; eng.className = 'badge warn'; eng.title = 'This browser cannot refract; open in Chrome or Edge for the full effect'; }
+  // labs that need refraction say so instead of silently doing nothing
+  if (!LiquidGlass.canRefract()) {
+    const note = document.createElement('p'); note.className = 'note-warn';
+    note.textContent = 'This browser has no SVG filters in backdrop-filter, so the drops stay apart and the lens sliders only change blur and surface. Open the page in Chrome or Edge to see merging and refraction.';
+    document.getElementById('mparams').before(note);
+  }
+  if (matchMedia('(pointer: coarse)').matches) document.querySelector('#lens small').textContent = 'tune it in Lens lab · double-tap to put back';
 
   // ---------- theme: system, light, dark ----------
   const THEMES = ['system', 'light', 'dark'];
   let theme = store.get('theme', 'system');
+  const THEME_ICON = {
+    system: '<path d="M12 3a9 9 0 1 0 0 18z" fill="currentColor"/><circle cx="12" cy="12" r="9"/>',
+    light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    dark: '<path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/>',
+  };
   const applyTheme = () => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = theme;
-    $('theme').title = 'Theme: ' + theme + ' (T)';
+    const b = $('theme');
+    b.innerHTML = `<svg viewBox="0 0 24 24">${THEME_ICON[theme]}</svg>`;
+    b.title = `Theme: ${theme} (T)`; b.setAttribute('aria-label', `Theme: ${theme}. Switch theme`);
   };
   applyTheme();
 
@@ -381,8 +407,22 @@
   // ---------- magnifier ----------
   const mag = $('mag');
   const magBounds = () => ({ minX: 0, minY: 0, maxX: stage.clientWidth - 128, maxY: stage.clientHeight - 96 });
-  // starts in the lower right corner, above the tab bar
-  LiquidUI.magnifier(mag, { x: Math.max(16, stage.clientWidth - 128 - 24), y: Math.max(16, stage.clientHeight - 96 - 130), bounds: magBounds });
+  // start in the first free spot of the stage, so the lens never covers another control or its label
+  const freeSpot = () => {
+    const sr = stage.getBoundingClientRect(), W = sr.width, H = sr.height, m = 16;
+    const busy = ['.ctl', '.lens-slot', '.merge-slot', '.dock-slot'].map((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { l: r.left - sr.left - 8, t: r.top - sr.top - 8, r: r.right - sr.left + 8, b: r.bottom - sr.top + 8 }; });
+    // scan the stage right to left, top to bottom; if nothing is free, take the spot that covers the least
+    const cover = (x, y) => busy.reduce((sum, q) => sum + Math.max(0, Math.min(x + 128, q.r) - Math.max(x, q.l)) * Math.max(0, Math.min(y + 96, q.b) - Math.max(y, q.t)), 0);
+    let best = [W - 128 - m, m], bestCover = Infinity;
+    for (let y = m; y <= H - 96 - m; y += 12) for (let x = W - 128 - m; x >= m; x -= 12) {
+      const c = cover(x, y);
+      if (c === 0) return [x, y];
+      if (c < bestCover) { bestCover = c; best = [x, y]; }
+    }
+    return best;
+  };
+  const [mx0, my0] = freeSpot();
+  const magnifier = LiquidUI.magnifier(mag, { x: Math.max(0, mx0), y: Math.max(0, my0), bounds: magBounds });
 
   // ---------- lens lab ----------
   const lensEl = $('lens');
@@ -452,17 +492,12 @@
   }
   function setLens(v) {
     lp = Object.assign({}, v);
-    // the slider components keep their own value: rebuild them in place
     for (const k in sliders) {
-      const { p, out } = sliders[k], host = $('ps-' + k);
-      const fresh = host.cloneNode(false); host.replaceWith(fresh);
-      sliders[k].s = LiquidUI.slider(fresh, { value: lp[k], min: p.min, max: p.max, label: p.label, onInput: (x) => {
-        x = Math.round(x / p.step) * p.step; lp[k] = x; out.textContent = k === 'radius' && x >= 110 ? 'capsule' : fmt(p, x); markPreset(); applyLens();
-      } });
+      const { p, out, s: sl } = sliders[k];
+      sl.value = lp[k];
       out.textContent = k === 'radius' && lp[k] >= 110 ? 'capsule' : fmt(p, lp[k]);
     }
-    const dh = $('depth'), nd = dh.cloneNode(false); dh.replaceWith(nd);
-    depthT = LiquidUI.toggle(nd, { checked: lp.depthEffect, onChange: (on) => { lp.depthEffect = on; markPreset(); applyLens(); } });
+    depthT.checked = lp.depthEffect;
     markPreset(); applyLens();
   }
   $('reset-lens').addEventListener('click', () => setLens(DEFAULT));
@@ -486,8 +521,10 @@
   renderCode();
 
   // drag the lens card anywhere on the stage; it springs back into its slot on double click
+  let resetLensPos = () => {};
   {
     let ox = 0, oy = 0, sx = 0, sy = 0, id = null;
+    resetLensPos = () => { ox = oy = 0; lens.set({ tx: 0, ty: 0 }); };
     lensEl.addEventListener('pointerdown', (e) => { id = e.pointerId; sx = e.clientX - ox; sy = e.clientY - oy; lensEl.setPointerCapture(id); lensEl.style.cursor = 'grabbing'; e.preventDefault(); });
     lensEl.addEventListener('pointermove', (e) => {
       if (e.pointerId !== id) return;
@@ -501,7 +538,7 @@
     });
     const up = (e) => { if (e.pointerId === id) { id = null; lensEl.style.cursor = ''; } };
     lensEl.addEventListener('pointerup', up); lensEl.addEventListener('pointercancel', up);
-    lensEl.addEventListener('dblclick', () => { ox = oy = 0; lens.set({ tx: 0, ty: 0 }); });
+    lensEl.addEventListener('dblclick', () => resetLensPos());
   }
 
   // ---------- merging pond ----------
@@ -558,7 +595,9 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-copy]'); if (!b) return;
     const t = b.dataset.copy, done = () => { b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => {}); else done();
+    const legacy = () => { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (_) {} ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) navigator.clipboard.writeText(t).then(done, legacy); else legacy();
   });
 
   // ---------- full screen: the stage alone fills the screen ----------
@@ -570,6 +609,7 @@
     if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
   };
   $('full').addEventListener('click', toggleFull);
+  $('exit').addEventListener('click', toggleFull);
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('immersive'); });
 
   // ---------- theme switch ----------
@@ -583,15 +623,27 @@
     const k = e.key.toLowerCase();
     if (k === 'f') toggleFull();
     else if (k === 't') $('theme').click();
-    else if (k === 'l') { const on = document.body.classList.contains('notags'); document.body.classList.toggle('notags', !on); store.set('notags', !on); }
+    else if (k === 'l') { const show = document.body.classList.contains('notags'); document.body.classList.toggle('notags', !show); store.set('notags', !show); tagsT.checked = show; }
     else if (k === 'escape' && document.body.classList.contains('immersive') && !document.fullscreenElement) toggleFull();
     else if (/^[1-4]$/.test(k)) goScene(+k - 1);
   });
 
   // ---------- fps ----------
-  { let n = 0, t0 = performance.now(); const fps = $('fps');
-    const tick = (t) => { n++; if (t - t0 >= 1000) { fps.textContent = Math.round((n * 1000) / (t - t0)) + ' fps'; n = 0; t0 = t; } requestAnimationFrame(tick); };
-    requestAnimationFrame(tick); }
+  // counted only while the badge is visible: an idle rAF loop on a phone would keep the CPU awake for nothing
+  { let n = 0, t0 = performance.now(), run = false; const fps = $('fps');
+    const tick = (t) => { if (!fps.offsetParent) { run = false; return; } n++; if (t - t0 >= 1000) { fps.textContent = Math.round((n * 1000) / (t - t0)) + ' fps'; n = 0; t0 = t; } requestAnimationFrame(tick); };
+    const start = () => { if (run || !fps.offsetParent) return; run = true; n = 0; t0 = performance.now(); requestAnimationFrame(tick); };
+    start(); new ResizeObserver(start).observe(document.body); }
+
+  // ---------- keep things on the stage when it changes size ----------
+  new ResizeObserver(() => {
+    magnifier.moveTo(magnifier.x, magnifier.y, false);
+    const st = stage.getBoundingClientRect(), r = lensEl.getBoundingClientRect();
+    if (r.left < st.left || r.top < st.top || r.right > st.right || r.bottom > st.bottom) resetLensPos();
+  }).observe(stage);
+
+  // side panel on touch screens: a vertical swipe that starts on a slider or toggle scrolls the page
+  if (matchMedia('(pointer: coarse)').matches) for (const el of $('side').querySelectorAll('.lgu-slider, .lgu-toggle')) el.style.touchAction = 'pan-y';
 
   goScene(store.get('scene', 0), 'init');
   addEventListener('pagehide', () => store.set('scene', sceneIndex));

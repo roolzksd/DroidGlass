@@ -55,7 +55,7 @@ Returns a handle: `g.set({...})` for cheap per-frame changes, `g.rebuild({...})`
 - `button(el, { tint, surface, interactive, onClick, glass, stretch: true, yieldScroll: false, reach: 0.36 })`: capsule, vibrancy, blur 2, lens(12, 24), press growth and glow, iOS-style stretch (see `math-and-motion.md`). `glass` passes options to `attach`.
 - `toggle(el, { checked, onChange })`, `slider(el, { value, onInput, label })`: thumbs that are white pills at rest and become lenses when pressed.
 - `tabs(el, { items: [{ label, icon }], index, onChange, accent, contentScale: 1, bubbleScale: 1.2, bubbleDispersion: 1, bubbleAspect: 1.35, bubbleHeight: 75, bubbleLens, pressGrow: 16 })`: returns `{ panel, ... }`.
-- `magnifier(el, { x, y, zoom: 1.5, bounds })`.
+- `magnifier(el, { x, y, zoom: 1.5, bounds })`: returns `{ x, y, moveTo(x, y, animate) }`; call `moveTo(m.x, m.y, false)` from a `ResizeObserver` so the lens stays inside its bounds when the screen changes size.
 - `blob([a, b, ...], groupOptions)`, `autoMerge(scope, { maxGap: 24, glass })`, `sweep()`, `refreshTouch()`.
 - Building blocks: `spring`, `Anim`, `DampedDrag`, `PressGlow`, `VelocityTracker`, `gesture`, `rubber`, `invalidate`, `onMotion`, `notify`.
 
@@ -112,6 +112,7 @@ Wiring:
 - For still images or custom layouts use the group directly: `const g = LiquidGlass.group(container, opts); g.add(el, { radius: 'capsule' });` (members may be plain elements; see `media/hero.html` in the repository).
 - At rest the gap between glass shapes must exceed 2.2 · merge, or they stick at once. Press growth also brings edges closer: for a bar next to a button use `pressGrow: 8` (default 16) and a 12 px gap.
 - The group layer is positioned from its container: the engine sets `position: relative` on a static container. Otherwise the layer's reference would be a distant ancestor that changes when the ancestor gains or loses a `transform` (a screen enter animation), and the layer would drift away from the buttons.
+- Without refraction (Safari, Firefox, `prefers-reduced-transparency`) `LiquidGlass.group` gives every member plain frosted glass of its own and `LiquidUI.blob` does nothing, so members keep their own fallback glass. Shapes do not merge there.
 - Cost: about 98 nodes in the expanded tree, two of them heavy (backdrop blur and displacement); glare, specular line and shading add only cheap steps.
 
 ## Startup without a half-built screen

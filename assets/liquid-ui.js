@@ -693,7 +693,17 @@
       up: () => { sx.animateTo(1, spring(0.6, 250, 0.001)); sy.animateTo(1, spring(0.7, 250, 0.001)); },
     });
     invalidate(render);
-    return { glass: g, destroy() { off(); g.destroy(); } };
+    return {
+      glass: g,
+      get x() { return tx; }, get y() { return ty; },
+      // move the lens (clamped to bounds), e.g. to keep it on screen after a resize
+      moveTo(x, y, animate = true) {
+        const b = o.bounds && o.bounds();
+        tx = b ? clamp(x, b.minX, Math.max(b.minX, b.maxX)) : x; ty = b ? clamp(y, b.minY, Math.max(b.minY, b.maxY)) : y;
+        if (animate) { pos.x.animateTo(tx, follow); pos.y.animateTo(ty, follow); } else { pos.x.snapTo(tx); pos.y.snapTo(ty); }
+      },
+      destroy() { off(); g.destroy(); },
+    };
   }
 
   // ---------- Merging glass: group (blob) ----------
@@ -705,6 +715,8 @@
   function blob(els, opts) {
     els = els.filter(Boolean);
     if (els.length < 1) return null;
+    // without refraction there is no merging: members keep their own fallback glass instead of being ghosted
+    if (!LG.canRefract() || (root.matchMedia && root.matchMedia('(prefers-reduced-transparency: reduce)').matches)) return null;
     let anc = els[0].parentElement;
     while (anc && !els.every((e) => anc.contains(e))) anc = anc.parentElement;
     if (!anc) return null;
