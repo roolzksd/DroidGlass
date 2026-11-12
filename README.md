@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://roolzksd.github.io/DroidGlass/assets/demo.html"><b>Live demo</b></a> ·
+  <a href="https://roolzksd.github.io/DroidGlass/assets/demo.html"><b>Live playground</b></a> ·
   <a href="#install">Install</a> ·
   <a href="#what-you-get">What you get</a> ·
   <a href="SKILL.md">SKILL.md</a>
@@ -36,6 +36,8 @@ Ask an agent for "liquid glass" and you usually get glassmorphism: a white haze 
 - **Jetpack Compose:** how to use Kyant's Backdrop library correctly, with recipe values from its catalog.
 - **SwiftUI, UIKit, AppKit, widgets:** the real system `glassEffect`, containers, unions, transitions and the rules that keep it looking native.
 - **A checklist and a troubleshooting table**, so the agent checks its own screenshots before handing the work over.
+
+The [live playground](https://roolzksd.github.io/DroidGlass/assets/demo.html) runs every component full screen over switchable backdrops, with a lens lab that turns sliders into copy-ready `LiquidGlass.attach` code and a merge lab for drops you can drag into each other. Best in Chrome or Edge.
 
 Zero dependencies, no build step: three plain files (about 115 KB unminified) the agent copies into your project.
 
@@ -117,7 +119,7 @@ assets/
   liquid-glass.js             glass engine (window.LiquidGlass)
   liquid-glass.css            base and component styles
   liquid-ui.js                springs, gestures, components (window.LiquidUI)
-  demo.html                   every component on one page
+  demo.html                   live playground: every component, lens and merge labs
 media/
   hero.jpg, hero.html         the banner above, rendered by the engine itself
 ```
