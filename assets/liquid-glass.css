@@ -80,57 +80,64 @@
 @keyframes lgIn { from { opacity: 0; } }
 
 /* ---------- menu (LiquidUI.menu): the glass is the group layer under the panel; the panel only holds content ---------- */
+/* metrics after iOS 26: 17 px rows of 44 px, the highlight pill inset 10 px and concentric with the corners,
+   icons at 26 px from the edge, labels at about 56 px, separators as hairlines with room above and below */
 .lgu-menu-layer {
-  --lgu-menu-ink: #0B0B0D; --lgu-menu-hl: rgb(0 0 0 / .075); --lgu-menu-sep: rgb(60 60 67 / .2);
-  --lgu-menu-red: #FF3B30; --lgu-menu-frost: rgb(246 246 248 / .8);
+  --lgu-menu-ink: #0B0B0D; --lgu-menu-hl: rgb(0 0 0 / .08); --lgu-menu-sep: rgb(60 60 67 / .18);
+  --lgu-menu-red: #FF3B30; --lgu-menu-frost: rgb(246 246 248 / .82);
   position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
   font-family: inherit; -webkit-tap-highlight-color: transparent;
 }
 .lgu-menu-layer.lgu-dark {
-  --lgu-menu-ink: #F5F5F7; --lgu-menu-hl: rgb(255 255 255 / .12); --lgu-menu-sep: rgb(235 235 245 / .16);
-  --lgu-menu-red: #FF453A; --lgu-menu-frost: rgb(30 30 34 / .78);
+  --lgu-menu-ink: #F5F5F7; --lgu-menu-hl: rgb(255 255 255 / .17); --lgu-menu-sep: rgb(235 235 245 / .16);
+  --lgu-menu-red: #FF453A; --lgu-menu-frost: rgb(30 30 34 / .8);
 }
-.lgu-menu-catch { position: absolute; inset: 0; pointer-events: auto; }
+.lgu-menu-catch { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
 .lgu-menu-proxy { position: absolute; pointer-events: none; transform-origin: 50% 50%; }
 .lgu-menu {
   position: absolute; overflow: hidden; pointer-events: auto; transform-origin: 0 0; outline: none;
-  color: var(--lgu-menu-ink); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  color: var(--lgu-menu-ink); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
+/* every part of the menu: a finger sliding over the rows is never taken for a scroll (the body is a scroll container,
+   so the panel's own touch-action would not reach the rows) */
+.lgu-menu, .lgu-menu * { touch-action: none; }
 .lgu-menu--frost { background: var(--lgu-menu-frost); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
 @media (prefers-reduced-transparency: reduce) { .lgu-menu--frost { background: rgb(242 242 247); backdrop-filter: none; -webkit-backdrop-filter: none; } .lgu-dark .lgu-menu--frost { background: rgb(28 28 30); } }
-.lgu-menu-body { position: relative; padding: 6px; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.lgu-menu-body { position: relative; padding: 10px; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; transform-origin: 0 0; }
 .lgu-menu-body::-webkit-scrollbar { display: none; }
-/* the finger lights the glass from within (WWDC25), a spot under it */
+/* the finger lights the glass from within (WWDC25), a soft spot under it */
 .lgu-menu-glow {
   position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: plus-lighter;
-  background: radial-gradient(circle 140px at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / .2), rgb(255 255 255 / .06) 55%, transparent 75%);
+  background: radial-gradient(circle 120px at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / .14), rgb(255 255 255 / .04) 55%, transparent 75%);
 }
 .lgu-menu-hl { position: absolute; left: 0; top: 0; z-index: 0; width: 0; height: 0; opacity: 0; pointer-events: none; background: var(--lgu-menu-hl); }
 .lgu-menu-item {
-  position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px;
-  border-radius: 20px; font-size: 17px; line-height: 1.25; letter-spacing: -.01em; cursor: default; outline: none; box-sizing: border-box;
+  position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+  border-radius: 22px; font-size: 17px; line-height: 1.25; letter-spacing: -.02em; cursor: default; outline: none; box-sizing: border-box;
 }
 .lgu-menu-item .lgu-mi-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lgu-menu-item:has(.lgu-mi-sub) { padding-top: 6px; padding-bottom: 6px; }
-.lgu-menu-item .lgu-mi-sub { display: block; font-size: 13px; line-height: 1.25; opacity: .6; overflow: hidden; text-overflow: ellipsis; }
+.lgu-menu-item:has(.lgu-mi-sub) { padding-top: 7px; padding-bottom: 7px; }
+.lgu-menu-item .lgu-mi-sub { display: block; font-size: 14px; line-height: 1.25; opacity: .6; overflow: hidden; text-overflow: ellipsis; }
 .lgu-menu-item .lgu-mi-icon { flex: none; width: 24px; height: 24px; display: grid; place-items: center; font-size: 20px; line-height: 1; }
-.lgu-menu-item .lgu-mi-check { flex: none; width: 18px; display: grid; place-items: center; margin-right: -4px; }
-.lgu-menu-item .lgu-mi-chev { flex: none; width: 16px; display: grid; place-items: center; opacity: .5; margin-right: -4px; }
+.lgu-menu-item .lgu-mi-check { flex: none; width: 18px; display: grid; place-items: center; }
+.lgu-menu-item .lgu-mi-chev { flex: none; width: 16px; display: grid; place-items: center; opacity: .45; margin-right: -2px; }
 .lgu-menu-item svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .lgu-menu-item .lgu-mi-check svg, .lgu-menu-item .lgu-mi-chev svg { width: 16px; height: 16px; stroke-width: 2.4; }
 .lgu-menu-item[aria-disabled="true"] { opacity: .35; }
 .lgu-menu-item.lgu-destructive { color: var(--lgu-menu-red); }
-.lgu-menu-back { font-weight: 600; }
-.lgu-menu-sep { height: 1px; margin: 6px 14px; background: var(--lgu-menu-sep); }
+.lgu-menu-head { font-weight: 600; }
+.lgu-menu-head .lgu-mi-chev { opacity: .6; }
+.lgu-menu-sep { height: 1px; margin: 9px 16px; background: var(--lgu-menu-sep); }
 /* top row: medium (3 icons with labels) and small (4 icons) layouts */
 .lgu-menu-row { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); }
-.lgu-menu-row .lgu-menu-item { flex-direction: column; justify-content: center; gap: 6px; min-height: 70px; padding: 8px 4px; font-size: 13px; font-weight: 500; text-align: center; border-radius: 18px; }
+.lgu-menu-row .lgu-menu-item { flex-direction: column; justify-content: center; gap: 6px; min-height: 72px; padding: 8px 4px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-align: center; border-radius: 22px; }
 .lgu-menu-row .lgu-mi-label { flex: none; max-width: 100%; }
-.lgu-menu-row.lgu-small .lgu-menu-item { min-height: 50px; }
-/* a sub-menu is its own glass panel in front of the menu; the wrapper holds its glass layer under it */
+.lgu-menu-row.lgu-small .lgu-menu-item { min-height: 52px; }
+/* a sub-menu card is its own glass in front of the menu; the wrapper holds its glass layer under it */
 .lgu-menu-subwrap { position: absolute; inset: 0; pointer-events: none; }
 @media (pointer: fine) {
-  .lgu-menu-item { min-height: 36px; font-size: 15px; }
+  .lgu-menu-item { min-height: 36px; font-size: 15px; border-radius: 18px; }
+  .lgu-menu-sep { margin: 6px 16px; }
   .lgu-menu-row .lgu-menu-item { min-height: 60px; font-size: 12px; }
   .lgu-menu-row.lgu-small .lgu-menu-item { min-height: 44px; }
 }

@@ -22,5 +22,11 @@ Menu springs and gesture thresholds in LiquidUI.menu are measured values publish
   https://github.com/facebook/astryx
   Copyright (c) 2026 Meta Platforms, Inc., licensed under the MIT License
 
+The layered sub-menu of LiquidUI.menu follows the native iOS behaviour as measured and described by:
+
+  liquid_glass_widgets by Sebastian Degenaar
+  https://github.com/sdegenaar/liquid_glass_widgets
+  Copyright (c) 2024-2026 Sebastian Degenaar, licensed under the MIT License
+
 Apple, iOS, macOS and SwiftUI are trademarks of Apple Inc. This project is not
 affiliated with or endorsed by Apple.

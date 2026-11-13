@@ -158,6 +158,7 @@ The banner at the top is not a mock-up: it is `media/hero.html`, a page that use
 - [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) (Apache-2.0): Backdrop library and catalog. The web engine ports its lens, dispersion, highlight and shadow formulas and its spring constants.
 - [iyinchao/liquid-glass-studio](https://github.com/iyinchao/liquid-glass-studio) (MIT): the merging scheme behind `LiquidGlass.group`.
 - [facebook/astryx](https://github.com/facebook/astryx) (MIT): UIKit springs and gesture thresholds for menus, measured on iOS 26.2.
+- [liquid_glass_widgets](https://github.com/sdegenaar/liquid_glass_widgets) (MIT): layered sub-menus measured from native iOS captures, the sliding highlight.
 - kube.io, "Liquid Glass in the Browser": refraction through `feDisplacementMap` in `backdrop-filter`.
 - Apple Human Interface Guidelines and WWDC25 "Meet Liquid Glass".
 

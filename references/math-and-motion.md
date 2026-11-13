@@ -58,12 +58,13 @@ Measured from UIKit on the iOS 26.2 simulator by the astryx project (MIT). UIKit
 | Menu closes | 0.85, response 0.35 s | 0.85, 322 |
 | Sub-menu opens in place | 0.85, response 0.4 s | 0.85, 247 |
 | Back out of a sub-menu | 1, response 0.4 s | 1, 247 |
-| Highlight follows the finger | SwiftUI `interactiveSpring()`: 0.86, response 0.15 s | 0.86, 1755 |
+| Highlight pill slides to the row under the finger | SwiftUI `interactiveSpring()`: 0.86, response 0.15 s | 0.86, 1755 |
+| The menu behind a sub-menu | recedes to 0.971, its rows dim 1 → 0.5 on the sub-menu spring | |
 | Hold before the menu opens under a finger | 150 ms; about 300 ms inside a scrolling view | |
 | Drift allowed during the hold | 13 px (UIKit opened at 12 pt, not at 14) | |
 | Travel before a held finger starts picking | 10 px | |
 
-Not measured anywhere and chosen by eye: the start scale 0.04 (UIKit grows popovers from 0.01; at 0.04 the panel is still a drop inside the button), the 20 px rubber band toward a finger held outside, and the highlight fade (1, 1500).
+The 0.971 recede is from native iOS captures (416 → 404 px) published by liquid_glass_widgets (MIT); the 0.5 dim is astryx's measurement. Not measured anywhere and chosen by eye: the round drop the menu pops out of (it rests at the panel's smaller side minus 16 px and melts into the panel between 0.8 and 1 of the growth), the 20 px rubber band toward a finger held outside, and the highlight fade (1, 1500).
 
 In the original the velocity in the drop formula keeps its sign, so moving left squeezes the thumb. The web code uses the absolute velocity, so the drop stretches the same both ways. On Android keep Kyant's behaviour or change it the same way if the user notices.
 

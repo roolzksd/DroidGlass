@@ -54,7 +54,7 @@ From the Human Interface Guidelines, WWDC25 "Meet Liquid Glass" and popular comm
 | Dialog, radius 48 | brightness 0.2 (light), saturation 1.5, blur 16 (dark 8), lens(24, 48, depth) | Plain | dims the backdrop #29293A 23% (dark #121212 56%) |
 | Control centre tile | vibrancy, lens(24, 48, depth) | Default, angle from device tilt, falloff 2 | enter: 48 dp offset and alpha |
 | Magnifier 128×96 | lens(8, 24, depth, dispersion), backdrop zoomed 1.5x | inner shadow 16 | drag |
-| Menu (web, `LiquidUI.menu`)* | merge group: blur 9, refraction 34, rim 16, saturation 1.7, page-coloured veil 64% (dark 58%) | glare 0.7, specular line 0.8, rim shading; shadow 0 16 44 at 16% | grows out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide to pick |
+| Menu (web, `LiquidUI.menu`)* | merge group: blur 10, refraction 34, rim 16, saturation 1.7, page-coloured veil 74% (dark 64%), radius 32 | glare 0.6, specular line 0.7, rim shading; shadow 0 16 44 at 16% | pops open out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide, the highlight pill slides between rows |
 
 \* Not from Kyant: the springs and gesture thresholds are measured from UIKit on iOS 26.2 (astryx), the material is matched to iOS screenshots by eye.
 
@@ -147,7 +147,7 @@ Screenshots at scale 2, look at them yourself:
 7. **Fallback:** fake the engine (Safari user agent and empty `navigator.userAgentData`) and check that elements did not turn into holes and icons under the tab bar thumb are not blurred.
 8. **Resize and rotation:** the map is rebuilt, no stair steps on the rim.
 9. **Screen transitions:** capture several consecutive frames while a screen enters; glass buttons are never darker than at rest, merge layers stay exactly under their buttons after the animation.
-10. **Menu:** frames of the entrance show a drop flowing out of the button, never an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a sub-menu is its own glass panel that grows from its row and may reach past the menu, the menu behind keeps its size, and a tap on it goes back; the menu stays inside the screen from a button in every corner.
+10. **Menu:** frames of the entrance show a round bubble popping out of the button, never a small box, an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a press inside the open menu and a slide moves the highlight pill smoothly from row to row (no `pointercancel`); a sub-menu is a glass card whose header lands on its row and which may reach past the menu, the menu behind keeps its size, recedes slightly and dims, and a tap on it goes back; the menu stays inside the screen from a button in every corner.
 11. **No console errors** and no hangs: after a burst of taps the page responds as fast. One animation loop, no stray `requestAnimationFrame`s.
 12. No more than 3 large glass elements on a phone screen, no glass on glass, no glass content.
 
@@ -159,6 +159,7 @@ If something fails, fix it first, then show the user.
 - Apple: Human Interface Guidelines "Materials", "Adopting Liquid Glass", WWDC25 "Meet Liquid Glass".
 - kube.io, "Liquid Glass in the Browser": refraction through `feDisplacementMap` inside `backdrop-filter`.
 - iyinchao/liquid-glass-studio (MIT): merging shapes via `smin`, Snell refraction, colourless glass with a highlight taken from the backdrop. `LiquidGlass.group` reproduces this scheme with SVG filters.
+- liquid_glass_widgets by Sebastian Degenaar (MIT): layered sub-menu cards measured from native iOS captures (the menu behind recedes 416 → 404 px, covered rows cross-fade, the header lands on its row), the sliding highlight pill.
 - facebook/astryx (MIT): UIKit springs and gesture thresholds for menus, measured on the iOS 26.2 simulator (open 0.8 / 0.32 s, close 0.85 / 0.35 s, sub-menu 0.85 / 0.4 s and 1 / 0.4 s back, hold 150 ms, hand-off 10 px). Apple HIG "Menus", "Pull-down buttons", "Pop-up buttons": layouts, groups, icons and checkmarks.
 - liquid-glass-react: near-zero blur, saturation, jelly on touch.
 - dev.to, "Liquid Glass on the Web: 6 ways": Safari's false yes from `@supports`.
