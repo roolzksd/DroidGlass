@@ -848,7 +848,9 @@
         const el = mkRow(it);
         if (checks) add(el, 'lgu-mi-check', it.checked ? MENU_ICONS.check : '');
         if (icons) add(el, 'lgu-mi-icon', it.icon || '');
-        add(el, 'lgu-mi-label').textContent = it.label;
+        const lab = add(el, 'lgu-mi-label'); lab.textContent = it.label;
+        // a second line in small type, like the current choice under a sub-menu in iOS 26
+        if (it.sub) { const sm = document.createElement('small'); sm.className = 'lgu-mi-sub'; sm.textContent = it.sub; lab.appendChild(sm); }
         if (it.submenu) add(el, 'lgu-mi-chev', MENU_ICONS.next);
         host.appendChild(el);
       }
