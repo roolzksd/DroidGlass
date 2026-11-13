@@ -33,3 +33,9 @@
 | A button pulled far away and released still fires | the click was not swallowed: pointer capture delivers it to the element even far from it |
 | Long press opens a menu or text selection in a WebView | `setOnLongClickListener(v -> true)`, `setHapticFeedbackEnabled(false)`, `contextmenu` prevented on the element |
 | UI appears piece by piece at startup | `LiquidGlass.hold()` / `release()` and a splash (`web.md`, Startup) |
+| A menu flashes without glass for a frame as it opens | the button's glass was hidden before the group's pictures were decoded; hide it after `group.ready()` and one frame, as `menu` does |
+| A round lens shows inside the open menu | the capsule in the button's place stays in the group; shrink it to scale 0 as the panel grows |
+| A sub-menu card is cut off at the bottom | the group layer was sized for the closed menu; `menu` adds room for its sub-menus to `margin`, in your own group raise `margin` |
+| The menu opens when the user only wanted to scroll | open on a hold of 150 ms (300 ms in a scrolling view) and cancel when the finger moves more than 13 px before that |
+| Typing in an open menu triggers page shortcuts | an old copy; the menu now stops its key events from reaching the page |
+| The menu jumps or picks the wrong row right after it opens | taps during the entrance must be ignored and a held finger must travel 10 px before it picks |

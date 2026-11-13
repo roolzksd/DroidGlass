@@ -56,6 +56,7 @@ Returns a handle: `g.set({...})` for cheap per-frame changes, `g.rebuild({...})`
 - `toggle(el, { checked, onChange })`, `slider(el, { value, onInput, label })`: thumbs that are white pills at rest and become lenses when pressed.
 - `tabs(el, { items: [{ label, icon }], index, onChange, accent, contentScale: 1, bubbleScale: 1.2, bubbleDispersion: 1, bubbleAspect: 1.35, bubbleHeight: 75, bubbleLens, pressGrow: 16 })`: returns `{ panel, ... }`.
 - `magnifier(el, { x, y, zoom: 1.5, bounds })`: returns `{ x, y, moveTo(x, y, animate) }`; call `moveTo(m.x, m.y, false)` from a `ResizeObserver` so the lens stays inside its bounds when the screen changes size.
+- `menu(trigger, { items, layout: 'large', onSelect, onOpen, onClose, minWidth: 250, maxWidth: 320, radius: 26, glass })`: a pull-down or pop-up menu that grows out of its button (below, "Menus"). Returns `{ open(), close(), isOpen, setItems(items), destroy() }`.
 - `blob([a, b, ...], groupOptions)`, `autoMerge(scope, { maxGap: 24, glass })`, `sweep()`, `refreshTouch()`.
 - Building blocks: `spring`, `Anim`, `DampedDrag`, `PressGlow`, `VelocityTracker`, `gesture`, `rubber`, `invalidate`, `onMotion`, `notify`.
 
@@ -114,6 +115,45 @@ Wiring:
 - The group layer is positioned from its container: the engine sets `position: relative` on a static container. Otherwise the layer's reference would be a distant ancestor that changes when the ancestor gains or loses a `transform` (a screen enter animation), and the layer would drift away from the buttons.
 - Without refraction (Safari, Firefox, `prefers-reduced-transparency`) `LiquidGlass.group` gives every member plain frosted glass of its own and `LiquidUI.blob` does nothing, so members keep their own fallback glass. Shapes do not merge there.
 - Cost: about 98 nodes in the expanded tree, two of them heavy (backdrop blur and displacement); glare, specular line and shading add only cheap steps.
+
+## Menus: the button turns into the menu
+
+`LiquidUI.menu` behaves like `UIMenu` on a button in iOS 26. Springs and gesture thresholds are measured from UIKit on the iOS 26.2 simulator by the astryx project (Meta, MIT); the material is chosen by eye to match iOS screenshots.
+
+```js
+LiquidUI.menu(document.getElementById('more'), {
+  layout: 'medium',            // 'large' (rows), 'medium' (first 3 items as a row of icons with labels), 'small' (first 4, icons only)
+  items: [
+    { label: 'Copy', icon: '<svg>…</svg>' }, { label: 'Share', icon: '<svg>…</svg>' }, { label: 'Pin', icon: '<svg>…</svg>' },
+    '-',                                                      // separator: a new group
+    { label: 'Sort By', icon: '<svg>…</svg>', submenu: [{ label: 'Name', checked: true }, { label: 'Date', checked: false }] },
+    { label: 'Delete', icon: '<svg>…</svg>', role: 'destructive', onSelect: () => {} },
+  ],
+  onSelect: (item) => {},
+});
+```
+
+- **Items:** `{ label, icon, checked, disabled, role: 'destructive', submenu, onSelect }`, or `'-'` for a separator. `items` may be a function: it is called on every open, so checks and labels show the current state. Within a group, icons are shown for all items or for none, and a check column appears when any item has `checked` (HIG).
+- **Morph.** One merge group holds a capsule in the button's place and the panel. The panel grows from the button's centre with a uniform scale from 0.04 to 1, so the field pictures are drawn once and only move: small, it is a drop inside the capsule; growing, it flows out of it, and the capsule shrinks into it. The material thickens with the scale: veil, backdrop blur and refraction rise from a clear button to a dense menu (larger glass is thicker, WWDC25). The button's own glass hides only after the group's pictures are decoded, so no frame is without glass.
+- **Placement.** The menu covers its button and opens toward the free side, 12 px from the screen edges; a long menu scrolls inside.
+- **Gestures, as in iOS:** a mouse opens on press. A finger opens on lift after a tap, or after a 150 ms hold (300 ms when the page scrolls), and may drift 13 px before that. With the menu open under a held finger, picking starts after 10 px of travel; lifting on a row picks it, lifting outside keeps the menu open. Rows light under the finger, a soft glow follows it, and a finger held outside stretches the menu toward it on a 20 px rubber band. Taps during the entrance are ignored. Outside: a mouse press closes; a finger closes on lift or on a pan longer than 10 px.
+- **Sub-menus** drill in place, like iOS on a phone: a card grows down from its row over the parent, the panel grows with it, the parent rows fade to 0.5. The card's first row (a chevron and the title) goes back.
+- **Keyboard and screen readers:** `role="menu"` with `menuitem` / `menuitemcheckbox`. Enter, Space, Down or Up on the button opens and focuses the first or last row; arrows, Home, End, letters (type-ahead), Enter and Space inside; Right opens a sub-menu, Left and Escape go back; Escape and Tab close and return focus to the button. While the menu is open its keys do not reach page shortcuts.
+- **Closes** on scroll outside the menu, on resize and on the wheel.
+- **Fallback:** without refraction (Safari, Firefox, reduced transparency) the panel is frosted glass, with the same gestures and springs. With reduced motion the menu fades in and out.
+- **Mouse:** on `pointer: fine` rows are 36 px with 15 px text instead of 44 px and 17 px.
+- **Cost:** a group of two members, 98 nodes in the expanded filter tree, 2 of them heavy, like any group (`performance.md`). It exists only while the menu is open. Per frame the script only moves the pictures and sets three filter attributes, about 0.15 ms.
+
+Group methods the menu relies on, also available for your own groups:
+
+| Method or option | What it does |
+|---|---|
+| `g.add(el, { radius, tint, live: true })` | a member moved and scaled by your own CSS `transform`; its rest rectangle is read from `offsetLeft` / `offsetTop`, the scale from the transform. `radius` may be a function `(w, h) => r` |
+| `g.tune({ veilOpacity, blur, refraction })` | change the material per frame without rebuilding |
+| `g.reshape(el)` | redraw a member's field pictures after its layout size changed; returns a promise that resolves once they are decoded and in use |
+| `g.ready()` | a promise that resolves when every member's pictures are decoded |
+| `observe: false` | no `ResizeObserver` on members (for members you resize yourself) |
+| `fadeIn: false` | no fade-in of the layer on creation |
 
 ## Startup without a half-built screen
 

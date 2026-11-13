@@ -48,6 +48,23 @@ All springs in Compose format `spring(dampingRatio, stiffness)`, mass 1. An exac
 | Button and bar bounce after release (web) | 0.5, 170 | with the finger's velocity, about 15% overshoot, settles in about 0.6 s; a stiff spring (300) on a large stretch looks like a snap with no animation |
 | Bar pulled past the edge tab (web) | same rubber band, `d` = 24 px | the panel moves 0.7 of the pull, elongates 0.6, the drop follows past the edge |
 
+### Menus (web, `LiquidUI.menu`)
+
+Measured from UIKit on the iOS 26.2 simulator by the astryx project (MIT). UIKit gives springs as damping ratio and response; in Compose terms stiffness = (2π / response)².
+
+| What | Spring or value | Compose |
+|---|---|---|
+| Menu opens out of its button | 0.8, response 0.32 s | 0.8, 386 |
+| Menu closes | 0.85, response 0.35 s | 0.85, 322 |
+| Sub-menu opens in place | 0.85, response 0.4 s | 0.85, 247 |
+| Back out of a sub-menu | 1, response 0.4 s | 1, 247 |
+| Highlight follows the finger | SwiftUI `interactiveSpring()`: 0.86, response 0.15 s | 0.86, 1755 |
+| Hold before the menu opens under a finger | 150 ms; about 300 ms inside a scrolling view | |
+| Drift allowed during the hold | 13 px (UIKit opened at 12 pt, not at 14) | |
+| Travel before a held finger starts picking | 10 px | |
+
+Not measured anywhere and chosen by eye: the start scale 0.04 (UIKit grows popovers from 0.01; at 0.04 the panel is still a drop inside the button), the 20 px rubber band toward a finger held outside, and the highlight fade (1, 1500).
+
 In the original the velocity in the drop formula keeps its sign, so moving left squeezes the thumb. The web code uses the absolute velocity, so the drop stretches the same both ways. On Android keep Kyant's behaviour or change it the same way if the user notices.
 
 ## Stretchy glass like `.interactive()` in iOS 26

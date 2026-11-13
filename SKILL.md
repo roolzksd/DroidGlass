@@ -1,6 +1,6 @@
 ---
 name: droidglass
-description: Builds Apple-style Liquid Glass UI (iOS 26 / macOS 26 look) on any platform. Web, Android WebView, Electron, Capacitor and Cordova get a ready, tested engine with real refraction, specular rims, merging drops and iOS-like stretchy buttons, toggles, sliders and tab bars. Jetpack Compose uses Kyant's Backdrop library; SwiftUI, UIKit and AppKit use the system glassEffect. Use whenever the user asks for liquid glass, Apple or iOS 26 glass, glassmorphism, frosted glass, a glass tab bar, glass buttons, toggles or sliders, or "make it look like Apple", even if the words Liquid Glass are not used.
+description: Builds Apple-style Liquid Glass UI (iOS 26 / macOS 26 look) on any platform. Web, Android WebView, Electron, Capacitor and Cordova get a ready, tested engine with real refraction, specular rims, merging drops and iOS-like stretchy buttons, toggles, sliders, tab bars and pull-down menus that grow out of their button. Jetpack Compose uses Kyant's Backdrop library; SwiftUI, UIKit and AppKit use the system glassEffect. Use whenever the user asks for liquid glass, Apple or iOS 26 glass, glassmorphism, frosted glass, a glass tab bar, glass buttons, toggles, sliders, menus or dropdowns, or "make it look like Apple", even if the words Liquid Glass are not used.
 license: Apache-2.0
 ---
 
@@ -54,6 +54,9 @@ From the Human Interface Guidelines, WWDC25 "Meet Liquid Glass" and popular comm
 | Dialog, radius 48 | brightness 0.2 (light), saturation 1.5, blur 16 (dark 8), lens(24, 48, depth) | Plain | dims the backdrop #29293A 23% (dark #121212 56%) |
 | Control centre tile | vibrancy, lens(24, 48, depth) | Default, angle from device tilt, falloff 2 | enter: 48 dp offset and alpha |
 | Magnifier 128×96 | lens(8, 24, depth, dispersion), backdrop zoomed 1.5x | inner shadow 16 | drag |
+| Menu (web, `LiquidUI.menu`)* | merge group: blur 9, refraction 34, rim 16, saturation 1.7, page-coloured veil 64% (dark 58%) | glare 0.7, specular line 0.8, rim shading; shadow 0 16 44 at 16% | grows out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide to pick |
+
+\* Not from Kyant: the springs and gesture thresholds are measured from UIKit on iOS 26.2 (astryx), the material is matched to iOS screenshots by eye.
 
 Springs, gestures and the shared math behind every platform are in `references/math-and-motion.md`.
 
@@ -77,6 +80,13 @@ Copy the three files from `assets/` into the project unchanged and configure the
     items: [{ label: 'Home', icon: '<svg>…</svg>' }, { label: 'Search', icon: '<svg>…</svg>' }],
     index: 0, onChange: (i) => {},
   });
+  // a menu that grows out of its button; items may be a function called on every open
+  LiquidUI.menu(document.getElementById('more'), {
+    layout: 'medium', // first 3 items as a row of icons with labels
+    items: [{ label: 'Copy', icon: '<svg>…</svg>' }, { label: 'Share', icon: '<svg>…</svg>' }, { label: 'Pin', icon: '<svg>…</svg>' }, '-',
+      { label: 'Sort By', submenu: [{ label: 'Name', checked: true }, { label: 'Date', checked: false }] },
+      { label: 'Delete', role: 'destructive', onSelect: () => {} }],
+  });
   // merging: a bar and a button next to it melt into one drop; neighbouring stretchy buttons do it by themselves
   // LiquidUI.blob([tabs.panel, fab], { blur: 3.5 }); LiquidUI.autoMerge(document.body); after a screen change LiquidUI.sweep()
   // bare glass for your own markup
@@ -89,7 +99,7 @@ Copy the three files from `assets/` into the project unchanged and configure the
 |---|---|
 | `assets/liquid-glass.js` | glass engine: refraction maps, dispersion, highlight, shadows, merging groups (`LiquidGlass`) |
 | `assets/liquid-glass.css` | base styles, accessibility fallbacks, component styles |
-| `assets/liquid-ui.js` | springs, gestures and components: button, toggle, slider, tabs, magnifier, blob, autoMerge (`LiquidUI`) |
+| `assets/liquid-ui.js` | springs, gestures and components: button, toggle, slider, tabs, magnifier, menu, blob, autoMerge (`LiquidUI`) |
 | `assets/demo.html` | every component on one page; open it to see what correct looks like |
 
 Before you change anything or wire it into an app, read `references/web.md`: it lists the Chromium facts that break almost every implementation (backdrop roots, `position: fixed`, `touch-action`, body backgrounds) and every option. When something looks wrong, go to `references/troubleshooting.md`; when anything stutters, `references/performance.md`.
@@ -105,7 +115,7 @@ Five things to never get wrong on the web:
 ## Accessibility and legibility
 
 - The web engine honours `prefers-reduced-transparency: reduce` (glass off, nearly opaque surface; Chrome and Edge 119+, not yet Safari or Firefox), `prefers-contrast: more` (solid surface and border) and `prefers-reduced-motion` (springs become instant).
-- Components get roles and keyboard support: button (Enter, Space), `switch` (Enter, Space), `slider` (arrows), `tablist` (left and right arrows). Label them with `aria-label` or `aria-labelledby`.
+- Components get roles and keyboard support: button (Enter, Space), `switch` (Enter, Space), `slider` (arrows), `tablist` (left and right arrows), `menu` (Enter, Space or arrows on the button; arrows, Home, End, type-ahead, Right and Left for sub-menus, Escape inside). Label them with `aria-label` or `aria-labelledby`.
 - On Android set `semantics { role = Role.Switch }` and labels, as in Kyant's catalog; on old Android check that the `onDrawSurface` colour is readable without effects.
 - Check text contrast over the **lightest and busiest** content that can end up under the panel: 4.5:1 for body text. If it fails, add blur and a surface or move the content. A text shadow does not fix it.
 
@@ -137,8 +147,9 @@ Screenshots at scale 2, look at them yourself:
 7. **Fallback:** fake the engine (Safari user agent and empty `navigator.userAgentData`) and check that elements did not turn into holes and icons under the tab bar thumb are not blurred.
 8. **Resize and rotation:** the map is rebuilt, no stair steps on the rim.
 9. **Screen transitions:** capture several consecutive frames while a screen enters; glass buttons are never darker than at rest, merge layers stay exactly under their buttons after the animation.
-10. **No console errors** and no hangs: after a burst of taps the page responds as fast. One animation loop, no stray `requestAnimationFrame`s.
-11. No more than 3 large glass elements on a phone screen, no glass on glass, no glass content.
+10. **Menu:** frames of the entrance show a drop flowing out of the button, never an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a sub-menu card grows from its row without being cut off; the menu stays inside the screen from a button in every corner.
+11. **No console errors** and no hangs: after a burst of taps the page responds as fast. One animation loop, no stray `requestAnimationFrame`s.
+12. No more than 3 large glass elements on a phone screen, no glass on glass, no glass content.
 
 If something fails, fix it first, then show the user.
 
@@ -148,6 +159,7 @@ If something fails, fix it first, then show the user.
 - Apple: Human Interface Guidelines "Materials", "Adopting Liquid Glass", WWDC25 "Meet Liquid Glass".
 - kube.io, "Liquid Glass in the Browser": refraction through `feDisplacementMap` inside `backdrop-filter`.
 - iyinchao/liquid-glass-studio (MIT): merging shapes via `smin`, Snell refraction, colourless glass with a highlight taken from the backdrop. `LiquidGlass.group` reproduces this scheme with SVG filters.
+- facebook/astryx (MIT): UIKit springs and gesture thresholds for menus, measured on the iOS 26.2 simulator (open 0.8 / 0.32 s, close 0.85 / 0.35 s, sub-menu 0.85 / 0.4 s and 1 / 0.4 s back, hold 150 ms, hand-off 10 px). Apple HIG "Menus", "Pull-down buttons", "Pop-up buttons": layouts, groups, icons and checkmarks.
 - liquid-glass-react: near-zero blur, saturation, jelly on touch.
 - dev.to, "Liquid Glass on the Web: 6 ways": Safari's false yes from `@supports`.
 - Community skills (affaan-m/ECC liquid-glass-design, freekmurze liquid-glass and others): container rules and `.interactive()`, modifier order, UIKit, widgets, iOS accessibility.

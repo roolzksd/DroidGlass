@@ -127,6 +127,14 @@
   .ctl .btns { display: flex; gap: 12px; }
   .gbtn { height: 48px; padding: 0 22px; border: 0; background: none; font: 600 16px/1 Inter, system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
   .gbtn.primary { text-shadow: none; }
+  .ctl .mns { display: flex; align-items: center; gap: 12px; }
+  .gbtn.more { width: 48px; padding: 0; display: grid; place-items: center; }
+  .gbtn.more svg { width: 22px; height: 22px; fill: currentColor; }
+  .gbtn.pop { display: inline-flex; align-items: center; gap: 7px; padding: 0 16px 0 20px; }
+  .gbtn.pop svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
+  .toast { position: absolute; left: 50%; top: 18px; z-index: 30; transform: translate(-50%, -8px); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
+    font: 600 13px/1 Inter, system-ui, sans-serif; color: #fff; background: rgb(8 10 20 / .72); padding: 8px 12px; border-radius: 9px; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
   .ctl .ts { display: flex; align-items: center; gap: 18px; }
   #vol { width: 200px; }
   .lens-slot { grid-area: lens; place-self: center; display: grid; justify-items: center; gap: 8px; }
@@ -145,6 +153,8 @@
   /* light backdrops: dark labels on the glass, the glass itself stays colourless */
   .stage[data-scene="Poster"] .gbtn:not(.primary), .stage[data-scene="Paper"] .gbtn:not(.primary),
   .stage[data-scene="Poster"] #lens, .stage[data-scene="Paper"] #lens { color: #10131C; text-shadow: none; }
+  .gbtn svg { filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+  .stage[data-scene="Poster"] .gbtn svg, .stage[data-scene="Paper"] .gbtn svg { filter: none; }
   .gbtn, #lens { transition: color .3s; }
   .exit { position: absolute; top: 14px; right: 14px; z-index: 5; display: none; background: rgb(8 10 20 / .55); color: #fff; }
   body.immersive .exit { display: inline-flex; }
@@ -213,7 +223,8 @@
         <li><b>2</b><span>Hold a tab and slide along the bar. Past the last tab the bar stretches toward the round button.</span></li>
         <li><b>3</b><span>Grab the toggle or slider thumb: at rest it is a white pill, pressed it turns into a lens.</span></li>
         <li><b>4</b><span>Drag the small capsule, the magnifier, over the <strong>Poster</strong> text.</span></li>
-        <li><b>5</b><span>Open this page in Safari or Firefox to see the fallback: soft blur, same highlights and springs.</span></li>
+        <li><b>5</b><span>Press and hold <strong>•••</strong>, slide down the menu and let go on a row. Hold <strong>Backdrop</strong> to drill into its sub-menu. A quick tap opens the menu too.</span></li>
+        <li><b>6</b><span>Open this page in Safari or Firefox to see the fallback: soft blur, same highlights and springs.</span></li>
       </ul>
     </section>
 
@@ -274,6 +285,13 @@
           <div class="ts"><div id="wifi" aria-label="Wi-Fi"></div><div id="vol"></div></div>
           <span class="tag">LiquidUI.toggle · slider</span>
         </div>
+        <div class="grp">
+          <div class="mns">
+            <button class="gbtn more" id="more" aria-label="More"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+            <button class="gbtn pop" id="pop" aria-label="Lens preset"><span id="pop-label">Default</span><svg viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg></button>
+          </div>
+          <span class="tag">LiquidUI.menu</span>
+        </div>
       </div>
       <div class="lens-slot">
         <div id="lens"><div>Drag me<small>tune it in Lens lab · double-click to put back</small></div></div>
@@ -295,6 +313,7 @@
         <span class="tag">LiquidUI.tabs · blob</span>
       </div>
     </div>
+    <span class="toast" id="toast" role="status"></span>
     <div id="mag" aria-label="Magnifier"></div>
     <button class="ibtn exit" id="exit" aria-label="Exit full screen"><svg viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>Exit</button>
   </main>
@@ -487,8 +506,11 @@
     b.addEventListener('click', () => setLens(PRESETS[name]));
     presetBox.appendChild(b);
   }
+  const same = (a, b) => Object.keys(a).every((k) => Math.abs(+a[k] - +b[k]) < 1e-6);
+  const presetName = () => same(DEFAULT, lp) ? 'Default' : Object.keys(PRESETS).find((n) => same(PRESETS[n], lp)) || 'Custom';
   function markPreset() {
-    for (const b of presetBox.children) { const pr = PRESETS[b.dataset.p]; b.setAttribute('aria-pressed', String(Object.keys(pr).every((k) => Math.abs(+pr[k] - +lp[k]) < 1e-6))); }
+    for (const b of presetBox.children) b.setAttribute('aria-pressed', String(same(PRESETS[b.dataset.p], lp)));
+    $('pop-label').textContent = presetName();
   }
   function setLens(v) {
     lp = Object.assign({}, v);
@@ -617,13 +639,46 @@
   $('theme').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; refreshTheme(); });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (theme === 'system') refreshTheme(); });
 
+  // ---------- menus: the button turns into the menu ----------
+  const I = (d) => `<svg viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+  const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(el.__t); el.__t = setTimeout(() => el.classList.remove('on'), 1300); };
+  const copyText = (t) => (navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied'), () => toast('Copy failed'));
+  const setAnim = (on) => { animT.checked = on; sceneEls.forEach((s) => s.classList.toggle('anim', on)); };
+  const setTags = (show) => { document.body.classList.toggle('notags', !show); store.set('notags', !show); tagsT.checked = show; };
+  LiquidUI.button($('more'), { stretch: false });
+  LiquidUI.menu($('more'), {
+    layout: 'medium',
+    items: () => [
+      { label: 'Copy code', icon: I('M9 9h11v11H9zM5 15H4V4h11v1'), onSelect: () => copyText($('copy-code').dataset.copy) },
+      { label: 'Theme', icon: `<svg viewBox="0 0 24 24">${THEME_ICON[theme]}</svg>`, onSelect: () => $('theme').click() },
+      { label: document.body.classList.contains('immersive') ? 'Exit' : 'Full screen', icon: I('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'), onSelect: toggleFull },
+      '-',
+      { label: 'Backdrop', icon: I(icons[names[sceneIndex]]), submenu: names.map((n, i) => ({ label: n, checked: i === sceneIndex, onSelect: () => goScene(i) })) },
+      '-',
+      { label: 'Animate backdrop', checked: animT.checked, onSelect: () => setAnim(!animT.checked) },
+      { label: 'API labels', checked: !document.body.classList.contains('notags'), onSelect: () => setTags(document.body.classList.contains('notags')) },
+      '-',
+      { label: 'Put lens back', icon: I('M4 12a8 8 0 1 0 3-6.2M4 4v5h5'), onSelect: () => resetLensPos() },
+      { label: 'Reset lens', icon: I('M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'), role: 'destructive', onSelect: () => setLens(DEFAULT) },
+    ],
+  });
+  // a pop-up button: the menu shows the choices, the button shows the current one
+  LiquidUI.button($('pop'), { stretch: false });
+  LiquidUI.menu($('pop'), {
+    items: () => {
+      const cur = presetName();
+      return [...Object.keys(PRESETS).map((n) => ({ label: n, checked: cur === n, onSelect: () => setLens(PRESETS[n]) })), '-',
+        { label: 'Default', checked: cur === 'Default', onSelect: () => setLens(DEFAULT) }];
+    },
+  });
+
   // ---------- keys ----------
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 'f') toggleFull();
     else if (k === 't') $('theme').click();
-    else if (k === 'l') { const show = document.body.classList.contains('notags'); document.body.classList.toggle('notags', !show); store.set('notags', !show); tagsT.checked = show; }
+    else if (k === 'l') setTags(document.body.classList.contains('notags'));
     else if (k === 'escape' && document.body.classList.contains('immersive') && !document.fullscreenElement) toggleFull();
     else if (/^[1-4]$/.test(k)) goScene(+k - 1);
   });

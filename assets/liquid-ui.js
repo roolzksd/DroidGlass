@@ -116,6 +116,7 @@
   // bounce after release: a soft underdamped spring, about 15% overshoot, settles in about 0.6 s.
   // A stiff spring (300 and up) on a large stretch looks like a snap with no animation.
   const BOUNCE = spring(0.5, 170, 0.05);
+  const PRESS_GLOW = spring(0.5, 300, 0.001);
 
   // who follows glass movement (merge groups); called in the same frame
   const motionWatch = new WeakMap();
@@ -768,8 +769,498 @@
     }
   }
 
+  // ---------- Menu (pull-down / pop-up), like UIMenu in iOS 26 ----------
+  // The button morphs into the menu. One merge group holds a capsule in the button's place and the menu panel.
+  // The panel grows out of the button's centre with a uniform scale (UIKit grows popovers the same way, from
+  // 0.01), so the field pictures are drawn once and only move: while the panel is small it is a drop inside the
+  // capsule, as it grows it flows out of it, and the capsule shrinks into the panel. The material thickens as it
+  // grows: veil, backdrop blur and refraction depth rise with the scale (WWDC25 "Meet Liquid Glass": larger glass
+  // is thicker, with deeper shadows and stronger lensing).
+  // Springs and thresholds measured from UIKit on iOS 26.2 (facebook/astryx, MIT): open 0.8 / 0.32 s, close
+  // 0.85 / 0.35 s, sub-menu 0.85 / 0.4 s and back 1 / 0.4 s; a held finger opens the menu after 150 ms (about
+  // 300 ms when the page scrolls), may drift 13 px before that, and starts picking only after 10 px of travel.
+  // The stretch toward a finger held outside the menu is not measured anywhere: a short rubber band (20 px).
+  const byResponse = (z, response, th = 0.001) => spring(z, Math.pow((2 * Math.PI) / response, 2), th);
+  const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const MENU = {
+    holdMs: 150, holdMsScroll: 300, slop: 13, handoff: 10, margin: 12, s0: 0.04, stretch: 20,
+    open: byResponse(0.8, 0.32), close: byResponse(0.85, 0.35), sub: byResponse(0.85, 0.4, 0.5), back: byResponse(1, 0.4, 0.5),
+    track: byResponse(0.86, 0.15, 0.1), fade: spring(1, 1500, 0.01),
+  };
+  const MENU_ICONS = {
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  };
+  const menuGlass = (dk) => ({
+    merge: 5, thickness: 16, refraction: 34, blur: 9, saturation: 1.7, rim: 0.16, rimWidth: 2.5, glare: 0.7, glareOpposite: 0.55,
+    specular: 0.8, shade: dk ? 0.04 : 0.06, shadeWidth: 10, veil: dk ? '#1C1C20' : '#F7F7F9', veilOpacity: dk ? 0.58 : 0.64,
+    shadow: 0.05, margin: 48, resolution: 0.25, observe: false, fadeIn: false,
+  });
+  const normItems = (items) => (items || []).map((it) => (it === '-' || it == null || it.separator) ? { separator: true } : Object.assign({}, typeof it === 'string' ? { label: it } : it));
+  let menuUid = 0;
+
+  // rows of one level: optional top row (layout 'medium': 3 items with labels, 'small': 4 icons), then groups
+  function menuRows(host, items, layout, back) {
+    const rows = [], hl = document.createElement('div');
+    hl.className = 'lgu-menu-hl'; host.appendChild(hl);
+    const mkRow = (it, cls) => {
+      const el = document.createElement('div');
+      el.className = 'lgu-menu-item' + (cls ? ' ' + cls : '') + (it.role === 'destructive' ? ' lgu-destructive' : '');
+      el.setAttribute('role', it.checked != null ? 'menuitemcheckbox' : 'menuitem');
+      if (it.checked != null) el.setAttribute('aria-checked', String(!!it.checked));
+      if (it.disabled) el.setAttribute('aria-disabled', 'true');
+      if (it.submenu) el.setAttribute('aria-haspopup', 'menu');
+      el.tabIndex = -1;
+      rows.push({ el, item: it, enabled: !it.disabled });
+      return el;
+    };
+    const add = (el, cls, html) => { const s = document.createElement('span'); s.className = cls; if (html != null) s.innerHTML = html; el.appendChild(s); return s; };
+    if (back) {
+      const el = mkRow({ label: back, back: true }, 'lgu-menu-back');
+      add(el, 'lgu-mi-icon', MENU_ICONS.back); add(el, 'lgu-mi-label').textContent = back;
+      host.appendChild(el); const sp = document.createElement('div'); sp.className = 'lgu-menu-sep'; sp.setAttribute('role', 'separator'); host.appendChild(sp);
+    }
+    let list = normItems(items);
+    const n = layout === 'small' ? 4 : layout === 'medium' ? 3 : 0;
+    if (n) {
+      const top = [];
+      while (list.length && top.length < n && !list[0].separator) top.push(list.shift());
+      if (list.length && list[0].separator) list.shift();
+      const row = document.createElement('div');
+      row.className = 'lgu-menu-row lgu-' + layout; row.style.setProperty('--n', top.length); row.setAttribute('role', 'group');
+      for (const it of top) {
+        const el = mkRow(it, 'lgu-menu-cell');
+        add(el, 'lgu-mi-icon', it.icon || '');
+        if (layout === 'medium') add(el, 'lgu-mi-label').textContent = it.label; else el.setAttribute('aria-label', it.label);
+        row.appendChild(el);
+      }
+      host.appendChild(row);
+      if (list.length) { const sp = document.createElement('div'); sp.className = 'lgu-menu-sep'; sp.setAttribute('role', 'separator'); host.appendChild(sp); }
+    }
+    // groups: icons for all items of a group or none (HIG), a check column when any item has a state
+    const groups = [[]];
+    for (const it of list) { if (it.separator) { if (groups[groups.length - 1].length) groups.push([]); } else groups[groups.length - 1].push(it); }
+    groups.filter((g) => g.length).forEach((g, gi) => {
+      if (gi) { const sp = document.createElement('div'); sp.className = 'lgu-menu-sep'; sp.setAttribute('role', 'separator'); host.appendChild(sp); }
+      const icons = g.some((it) => it.icon), checks = g.some((it) => it.checked != null);
+      for (const it of g) {
+        const el = mkRow(it);
+        if (checks) add(el, 'lgu-mi-check', it.checked ? MENU_ICONS.check : '');
+        if (icons) add(el, 'lgu-mi-icon', it.icon || '');
+        add(el, 'lgu-mi-label').textContent = it.label;
+        if (it.submenu) add(el, 'lgu-mi-chev', MENU_ICONS.next);
+        host.appendChild(el);
+      }
+    });
+    return { rows, hl };
+  }
+
+  function menu(trigger, opts) {
+    const o = Object.assign({ items: [], layout: 'large', onSelect: null, onOpen: null, onClose: null, minWidth: 250, maxWidth: 320, radius: 26, glass: null }, opts);
+    const id = 'lgu-menu-' + ++menuUid;
+    if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { stretch: false });
+    trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
+    trigger.style.touchAction = 'none'; // a held finger slides from the button into the menu: the browser must not take it for a scroll
+    trigger.style.webkitTouchCallout = 'none';
+    const noCtx = (e) => e.preventDefault();
+    trigger.addEventListener('contextmenu', noCtx);
+
+    let state = 'closed', ui = null, press = null, lit = null, kbd = false, openedAt = 0;
+    const inv = () => invalidate(render);
+    const sA = new Anim(MENU.s0, inv), stx = new Anim(0, inv), sty = new Anim(0, inv), glowA = new Anim(0, inv);
+    const hlA = { x: new Anim(0, inv), y: new Anim(0, inv), w: new Anim(0, inv), h: new Anim(0, inv), op: new Anim(0, inv) };
+
+    const vw = () => document.documentElement.clientWidth || root.innerWidth, vh = () => root.innerHeight;
+    function triggerRadius(r) {
+      const v = parseFloat(getComputedStyle(trigger).borderTopLeftRadius) || 0;
+      return v >= Math.min(r.width, r.height) / 2 - 0.5 ? 'capsule' : v;
+    }
+
+    // ---------- build ----------
+    function build() {
+      const dk = dark(), T = trigger.getBoundingClientRect();
+      const layer = document.createElement('div'); layer.className = 'lgu-menu-layer' + (dk ? ' lgu-dark' : '');
+      const catcher = document.createElement('div'); catcher.className = 'lgu-menu-catch';
+      const proxy = document.createElement('div'); proxy.className = 'lgu-menu-proxy';
+      const panel = document.createElement('div'); panel.className = 'lgu-menu'; panel.id = id;
+      panel.setAttribute('role', 'menu'); panel.tabIndex = -1;
+      if (trigger.id) panel.setAttribute('aria-labelledby', trigger.id); else if (trigger.getAttribute('aria-label')) panel.setAttribute('aria-label', trigger.getAttribute('aria-label'));
+      const glow = document.createElement('div'); glow.className = 'lgu-menu-glow';
+      const body = document.createElement('div'); body.className = 'lgu-menu-body';
+      panel.append(glow, body); layer.append(catcher, proxy, panel); document.body.appendChild(layer);
+      const lvl = menuRows(body, typeof o.items === 'function' ? o.items() : o.items, o.layout, null); // a function: items with fresh state on every open
+      // size: natural width within limits, height up to the screen; long menus scroll
+      panel.style.width = 'max-content';
+      const m = MENU.margin, W = Math.round(clamp(panel.offsetWidth, o.minWidth, Math.min(o.maxWidth, vw() - 2 * m)));
+      panel.style.width = W + 'px';
+      const maxH = vh() - 2 * m;
+      let H = Math.min(panel.offsetHeight, maxH);
+      body.style.maxHeight = maxH + 'px';
+      // place: the menu covers its button and opens toward the room (iOS 26)
+      let L = T.left + W <= vw() - m ? T.left : T.right - W >= m ? T.right - W : clamp(T.left, m, vw() - m - W);
+      let Tp = T.top + H <= vh() - m ? T.top : T.bottom - H >= m ? T.bottom - H : clamp(T.top, m, vh() - m - H);
+      L = Math.max(4, L); Tp = Math.max(4, Tp);
+      const R = Math.min(o.radius, W / 2, H / 2);
+      Object.assign(panel.style, { left: L + 'px', top: Tp + 'px', height: H + 'px', borderRadius: R + 'px' });
+      const tr = triggerRadius(T);
+      Object.assign(proxy.style, { left: T.left + 'px', top: T.top + 'px', width: T.width + 'px', height: T.height + 'px', borderRadius: tr === 'capsule' ? '9999px' : tr + 'px' });
+      const refract = LG.canRefract() && !(root.matchMedia && root.matchMedia('(prefers-reduced-transparency: reduce)').matches);
+      let grp = null;
+      const g = Object.assign(menuGlass(dk), o.glass || {}), target = { veil: g.veilOpacity, blur: g.blur, refr: g.refraction };
+      if (refract) {
+        // headroom for a sub-menu that grows the panel: its card starts at its row (estimated from row height)
+        const extra = Math.max(0, ...lvl.rows.filter((r) => r.item.submenu).map((r) => {
+          const n = normItems(r.item.submenu).length + 1, rh = r.el.offsetHeight;
+          return r.el.getBoundingClientRect().top - panel.getBoundingClientRect().top + n * rh + 30 - H;
+        }));
+        g.margin += Math.min(extra, maxH);
+        grp = LG.group(layer, g);
+        grp.add(proxy, { radius: tr, live: true });
+        grp.add(panel, { radius: () => ui ? ui.R : R, live: true });
+        grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
+      } else panel.classList.add('lgu-menu--frost');
+      ui = {
+        layer, catcher, proxy, panel, glow, body, grp, refract, dk, R, W, H, H0: H, L, T: Tp, maxH,
+        ax: T.left + T.width / 2 - L, ay: T.top + T.height / 2 - Tp, // anchor: the button's centre in panel space
+        veil: target.veil, blur: target.blur, refr: target.refr,
+        levels: [{ host: body, rows: lvl.rows, hl: lvl.hl }], hA: new Anim(H, inv), dy: new Anim(0, inv), shapeBusy: false, shapeH: H, curH: H, dim: 1,
+      };
+      catcher.addEventListener('pointerdown', onCatchDown);
+      catcher.addEventListener('wheel', () => close(), { passive: true });
+      panel.addEventListener('pointerdown', onPanelDown);
+      // a mouse highlights the row under it without a press, like any desktop menu
+      panel.addEventListener('pointermove', (e) => { if (!press && e.pointerType === 'mouse' && state === 'open' && !entering()) { kbd = false; light(rowAt(e.clientX, e.clientY)); } });
+      panel.addEventListener('pointerleave', (e) => { if (!press && e.pointerType === 'mouse' && !kbd) light(null); });
+      panel.addEventListener('keydown', onKey);
+      panel.addEventListener('contextmenu', noCtx);
+    }
+
+    // ---------- frame ----------
+    function render() {
+      if (!ui) return;
+      const u = ui, s = sA.value, W = u.W, H = u.hA.value;
+      if (Math.abs(H - u.curH) > 0.01) { u.curH = H; u.panel.style.height = H.toFixed(2) + 'px'; reshape(); }
+      // growth about the anchor, then the stretch toward a finger held outside
+      let l = u.ax * (1 - s), t = u.ay * (1 - s) + u.dy.value, w = W * s, h = H * s;
+      const fx = stx.value, fy = sty.value;
+      const dl = fx > 0 ? 0.25 * fx : fx, dr = fx > 0 ? fx : 0.25 * fx, dt = fy > 0 ? 0.25 * fy : fy, db = fy > 0 ? fy : 0.25 * fy;
+      l += dl; w += dr - dl; t += dt; h += db - dt;
+      u.panel.style.transform = `translate(${l.toFixed(2)}px, ${t.toFixed(2)}px) scale(${(w / W).toFixed(4)}, ${(h / H).toFixed(4)})`;
+      const e = smoothstep(0.15, 1, s);
+      u.panel.style.boxShadow = `0 ${(16 * e).toFixed(1)}px ${(44 * e).toFixed(1)}px rgb(0 0 0 / ${(0.16 * e).toFixed(3)}), 0 ${(2 * e).toFixed(1)}px ${(8 * e).toFixed(1)}px rgb(0 0 0 / ${(0.05 * e).toFixed(3)})`;
+      const op = smoothstep(0.3, 0.78, s);
+      u.body.style.opacity = (op * u.dim).toFixed(3);
+      u.body.style.filter = op < 0.999 ? `blur(${((1 - op) * 5).toFixed(2)}px)` : '';
+      // the capsule shrinks into the panel and leaves the group (a zero-size member adds nothing to the field)
+      u.proxy.style.transform = `scale(${lerp(1, 0, smoothstep(0.12, 0.85, s)).toFixed(4)})`;
+      if (u.grp) {
+        u.grp.tune({ veilOpacity: u.veil * smoothstep(0.06, 0.6, s), blur: lerp(1, u.blur, smoothstep(0, 0.7, s)), refraction: lerp(18, u.refr, smoothstep(0, 1, s)) });
+        u.grp.update();
+      } else u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
+      // highlight platter and finger glow
+      const lv = u.levels[u.levels.length - 1], hs = lv.hl.style;
+      hs.transform = `translate(${hlA.x.value.toFixed(2)}px, ${hlA.y.value.toFixed(2)}px)`;
+      hs.width = hlA.w.value.toFixed(2) + 'px'; hs.height = hlA.h.value.toFixed(2) + 'px'; hs.opacity = hlA.op.value.toFixed(3);
+      u.glow.style.opacity = glowA.value.toFixed(3);
+    }
+    // the panel's layout height changed (a sub-menu): new glass pictures, one request at a time
+    function reshape() {
+      const u = ui;
+      if (!u || !u.grp || u.shapeBusy) return;
+      u.shapeBusy = true;
+      u.grp.reshape(u.panel).then(() => { u.shapeBusy = false; if (ui === u && Math.abs(u.panel.offsetHeight - u.shapeH) > 0.5) { u.shapeH = u.panel.offsetHeight; reshape(); } });
+      u.shapeH = u.panel.offsetHeight;
+    }
+
+    // ---------- open / close ----------
+    const entering = () => state === 'open' && sA.value < 0.98 && performance.now() - openedAt < 400;
+    function setTriggerGlass(on) { const h = LG.of(trigger); if (h && !trigger.__lgBlob) h.set({ ghost: !on }); }
+    function open(how = {}) {
+      if (state !== 'closed') return;
+      state = 'open'; openedAt = performance.now(); kbd = !!how.keyboard; lit = null;
+      build();
+      const u = ui;
+      trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', id);
+      for (const a of Object.values(hlA)) a.snapTo(0);
+      stx.snapTo(0); sty.snapTo(0); glowA.snapTo(0);
+      sA.snapTo(MENU.s0);
+      if (reduceMotion()) {
+        sA.snapTo(1);
+        for (const el of [u.panel, u.grp && u.grp.layer].filter(Boolean)) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      } else sA.animateTo(1, MENU.open);
+      render();
+      // the button's own glass gives way once the group's pictures are decoded: no frame without glass
+      if (u.grp) u.grp.ready().then(nextFrame).then(() => { if (ui === u && state === 'open') setTriggerGlass(false); });
+      else setTriggerGlass(false);
+      root.addEventListener('keydown', onDocKey, true);
+      root.addEventListener('resize', onWinChange); root.addEventListener('scroll', onScroll, true);
+      if (kbd) focusRow(how.last ? -1 : 0); else u.panel.focus({ preventScroll: true });
+      if (o.onOpen) o.onOpen();
+    }
+    function close(how = {}) {
+      if (state !== 'open' || !ui) return;
+      state = 'closing';
+      const u = ui;
+      light(null); glowA.animateTo(0, MENU.fade); stx.animateTo(0, BOUNCE); sty.animateTo(0, BOUNCE);
+      trigger.setAttribute('aria-expanded', 'false'); trigger.removeAttribute('aria-controls');
+      root.removeEventListener('keydown', onDocKey, true);
+      root.removeEventListener('resize', onWinChange); root.removeEventListener('scroll', onScroll, true);
+      const hadFocus = u.layer.contains(document.activeElement);
+      const finish = () => {
+        if (ui !== u) return;
+        setTriggerGlass(true);
+        if (u.grp) u.grp.destroy();
+        u.layer.remove(); ui = null; state = 'closed';
+        if (hadFocus || how.focus) trigger.focus({ preventScroll: true });
+        if (o.onClose) o.onClose();
+      };
+      if (how.instant) { finish(); return; }
+      if (reduceMotion()) {
+        const els = [u.panel, u.grp && u.grp.layer].filter(Boolean);
+        Promise.all(els.map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: 'ease-in', fill: 'forwards' }).finished)).then(finish, finish);
+        return;
+      }
+      sA.animateTo(MENU.s0, MENU.close);
+      // hand back to the button as soon as the panel is a small drop inside the capsule
+      until(() => sA.value < 0.08 || ui !== u).then(finish);
+    }
+    const onWinChange = () => close({ instant: true });
+    const onScroll = (e) => { if (ui && !ui.panel.contains(e.target)) close({ instant: true }); };
+
+    // ---------- rows: hit testing, highlight, actions ----------
+    const level = () => ui.levels[ui.levels.length - 1];
+    function rowAt(x, y) {
+      for (const r of level().rows) { const q = r.el.getBoundingClientRect(); if (x >= q.left && x < q.right && y >= q.top && y < q.bottom) return r; }
+      return null;
+    }
+    function inPanel(x, y) { const q = ui.panel.getBoundingClientRect(); return x >= q.left && x < q.right && y >= q.top && y < q.bottom; }
+    function light(r) {
+      if (r && !r.enabled) r = null;
+      if (r === lit) return;
+      const was = lit; lit = r;
+      if (!r) { hlA.op.animateTo(0, MENU.fade); return; }
+      const el = r.el, x = el.offsetLeft, y = el.offsetTop, w = el.offsetWidth, h = el.offsetHeight;
+      const jump = !was || hlA.op.value < 0.05;
+      for (const [a, v] of [[hlA.x, x], [hlA.y, y], [hlA.w, w], [hlA.h, h]]) { if (jump) a.snapTo(v); else a.animateTo(v, MENU.track); }
+      level().hl.style.borderRadius = getComputedStyle(el).borderRadius;
+      hlA.op.animateTo(1, MENU.fade);
+    }
+    function focusRow(i) {
+      const rows = level().rows.filter((r) => r.enabled);
+      if (!rows.length) return;
+      const r = rows[(i + rows.length) % rows.length];
+      r.el.focus({ preventScroll: true }); r.el.scrollIntoView({ block: 'nearest' }); light(r);
+    }
+    function activate(r) {
+      if (!r || !r.enabled) return;
+      const it = r.item;
+      if (it.back) { closeSub(); return; }
+      if (it.submenu) { openSub(r); return; }
+      close({ focus: kbd });
+      if (it.onSelect) it.onSelect(it);
+      if (o.onSelect) o.onSelect(it);
+    }
+
+    // ---------- sub-menu: drills in place, a card grows down from its row ----------
+    function openSub(r) {
+      const u = ui, parent = level(), pad = 6;
+      const card = document.createElement('div'); card.className = 'lgu-menu-card'; card.setAttribute('role', 'menu');
+      const lvl = menuRows(card, r.item.submenu, 'large', r.item.label);
+      u.panel.appendChild(card);
+      const ph = u.panel.getBoundingClientRect(), rq = r.el.getBoundingClientRect(), k = ph.height / u.hA.value || 1;
+      const rowTop = (rq.top - ph.top) / k, rowH = r.el.offsetHeight;
+      card.style.width = u.W - 2 * pad + 'px';
+      const cardH = card.offsetHeight;
+      let top = rowTop, need = Math.max(u.hA.target, top + cardH + pad);
+      if (need > u.maxH) { need = u.maxH; top = Math.max(pad, need - pad - cardH); }
+      const lv = { host: card, rows: lvl.rows, hl: lvl.hl, card, top, cardH, rowH, parent, need0: u.hA.target };
+      parent.hl.style.opacity = '0'; lit = null; hlA.op.snapTo(0);
+      u.levels.push(lv);
+      Object.assign(card.style, { top: top + 'px', height: rowH + 'px' });
+      parent.host.style.pointerEvents = 'none';
+      // the parent's rows recede to half opacity as the card grows (measured: 1 -> 0.5)
+      const cH = new Anim(rowH, () => { card.style.height = cH.value.toFixed(2) + 'px'; card.style.opacity = smoothstep(rowH, rowH + 24, cH.value).toFixed(3); u.dim = lerp(1, 0.5, smoothstep(rowH, cardH, cH.value)); inv(); });
+      lv.cH = cH;
+      card.style.opacity = '0';
+      cH.animateTo(cardH, MENU.sub);
+      // keep the panel on screen while it grows
+      const over = u.T + need + u.dy.target - (vh() - MENU.margin);
+      if (over > 0) u.dy.animateTo(u.dy.target - over, MENU.sub);
+      if (need > u.hA.target) u.hA.animateTo(need, MENU.sub);
+      light(null);
+      if (kbd) setTimeout(() => focusRow(1), 0);
+    }
+    function closeSub() {
+      const u = ui, lv = u.levels.length > 1 ? u.levels.pop() : null;
+      if (!lv) return;
+      light(null);
+      lv.parent.host.style.pointerEvents = ''; lv.card.style.pointerEvents = 'none'; // the shrinking card never takes a tap meant for the parent
+      lv.cH.animateTo(lv.rowH, MENU.back).then(() => lv.card.remove());
+      if (u.hA.target !== lv.need0) u.hA.animateTo(lv.need0, MENU.back);
+      if (u.dy.target !== 0 && u.levels.length === 1) u.dy.animateTo(0, MENU.back);
+      if (kbd) setTimeout(() => focusRow(0), 0);
+    }
+
+    // ---------- gestures ----------
+    // one press at a time: from the button (open, then slide onto an item) or inside the open menu
+    function track(e, from) {
+      press = { id: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, from, opened: from === 'panel', handed: from === 'panel', hand: null, dead: false, timer: 0, x: e.clientX, y: e.clientY };
+      root.addEventListener('pointermove', onMove, true);
+      root.addEventListener('pointerup', onUp, true);
+      root.addEventListener('pointercancel', onCancel, true);
+    }
+    function untrack() {
+      if (!press) return;
+      clearTimeout(press.timer);
+      root.removeEventListener('pointermove', onMove, true);
+      root.removeEventListener('pointerup', onUp, true);
+      root.removeEventListener('pointercancel', onCancel, true);
+      press = null;
+      if (ui && state === 'open') {
+        glowA.animateTo(0, MENU.fade);
+        if (stx.value || sty.value) { stx.animateTo(0, BOUNCE); sty.animateTo(0, BOUNCE); }
+      }
+    }
+    function scrub(x, y) {
+      if (!ui || state !== 'open') return;
+      light(rowAt(x, y));
+      const q = ui.panel.getBoundingClientRect(), k = q.width / ui.W || 1;
+      ui.panel.style.setProperty('--mx', ((x - q.left) / k).toFixed(1) + 'px');
+      ui.panel.style.setProperty('--my', ((y - q.top) / k).toFixed(1) + 'px');
+      if (glowA.target !== 1) glowA.animateTo(1, PRESS_GLOW);
+      if (!reduceMotion()) {
+        // stretch toward a finger held outside the menu (rest box, not the stretched one)
+        const L = ui.L, T = ui.T + ui.dy.value, R = L + ui.W, B = T + ui.hA.value;
+        const ex = x < L ? x - L : x > R ? x - R : 0, ey = y < T ? y - T : y > B ? y - B : 0;
+        stx.snapTo(rubber(ex, MENU.stretch)); sty.snapTo(rubber(ey, MENU.stretch));
+      }
+      autoScroll();
+    }
+    // a finger resting near the top or bottom of a menu that scrolls scrolls it, and the lit row follows
+    function autoScroll() {
+      if (!press || !press.handed || !ui) return;
+      const b = level().host === ui.body ? ui.body : null;
+      if (!b || b.scrollHeight <= b.clientHeight + 1) return;
+      const q = ui.panel.getBoundingClientRect(), zone = 32;
+      const v = press.y < q.top + zone ? -(q.top + zone - press.y) : press.y > q.bottom - zone ? press.y - (q.bottom - zone) : 0;
+      if (!v || press.y < q.top - 8 || press.y > q.bottom + 8) return;
+      b.scrollTop += clamp(v, -zone, zone) * 0.5;
+      light(rowAt(press.x, press.y));
+      invalidate(autoScroll);
+    }
+    function onTriggerDown(e) {
+      if (e.button > 0 || press || state === 'closing') return;
+      if (state === 'open') return;
+      track(e, 'trigger');
+      try { trigger.setPointerCapture(e.pointerId); } catch (_) {}
+      kbd = false;
+      if (e.pointerType === 'mouse') { e.preventDefault(); press.opened = true; open(); return; }
+      const p = press;
+      p.timer = setTimeout(() => { if (press === p && !p.dead) { p.opened = true; open(); } }, scrollsY(trigger) ? MENU.holdMsScroll : MENU.holdMs);
+    }
+    function onPanelDown(e) {
+      if (e.button > 0 || press) return;
+      if (entering()) { e.preventDefault(); return; } // a tap while the menu grows does nothing (iOS)
+      if (e.pointerType === 'mouse') e.preventDefault();
+      kbd = false;
+      track(e, 'panel');
+      try { ui.panel.setPointerCapture(e.pointerId); } catch (_) {}
+      scrub(e.clientX, e.clientY); // rows that fit light up on touch-down
+    }
+    function onMove(e) {
+      const p = press;
+      if (!p || e.pointerId !== p.id) return;
+      p.x = e.clientX; p.y = e.clientY;
+      if (!p.opened) {
+        if (Math.hypot(p.x - p.x0, p.y - p.y0) > MENU.slop) { p.dead = true; untrack(); }
+        return;
+      }
+      if (!p.handed) {
+        if (!p.hand) p.hand = [p.x, p.y]; // the first position the open menu sees
+        if (Math.hypot(p.x - p.hand[0], p.y - p.hand[1]) < MENU.handoff) return;
+        p.handed = true;
+      }
+      scrub(p.x, p.y);
+    }
+    function onUp(e) {
+      const p = press;
+      if (!p || e.pointerId !== p.id) return;
+      if (p.dead) { untrack(); return; }
+      if (!p.opened) { untrack(); open(); return; } // a tap opens on release
+      if (p.handed && ui && state === 'open') {
+        const r = rowAt(e.clientX, e.clientY);
+        if (r && r.enabled) { untrack(); activate(r); return; }
+        // a finger lifted outside keeps the menu open; a mouse released outside after a drag closes it
+        if (!r && p.type === 'mouse' && !inPanel(e.clientX, e.clientY)) { untrack(); close(); return; }
+      }
+      untrack();
+      if (lit && !kbd) light(null);
+    }
+    function onCancel(e) { if (press && e.pointerId === press.id) { untrack(); if (ui && !kbd) light(null); } }
+    // outside: a mouse press closes at once; a finger closes as it starts to pan or when it lifts
+    function onCatchDown(e) {
+      e.preventDefault();
+      if (state !== 'open' || entering()) return;
+      if (e.pointerType === 'mouse') { close(); return; }
+      const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
+      const mv = (ev) => { if (ev.pointerId === pid && Math.hypot(ev.clientX - x0, ev.clientY - y0) > MENU.handoff) done(); };
+      const done = () => { root.removeEventListener('pointermove', mv, true); root.removeEventListener('pointerup', done, true); root.removeEventListener('pointercancel', done, true); close(); };
+      root.addEventListener('pointermove', mv, true); root.addEventListener('pointerup', done, true); root.addEventListener('pointercancel', done, true);
+    }
+
+    // ---------- keyboard ----------
+    function onTriggerKey(e) {
+      if (state !== 'closed') return;
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        open({ keyboard: true, last: e.key === 'ArrowUp' });
+      }
+    }
+    function onDocKey(e) {
+      if (!ui || state !== 'open') return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (ui.levels.length > 1) closeSub(); else close({ focus: true }); }
+      else if (e.key === 'Tab') { e.preventDefault(); close({ focus: true }); }
+    }
+    function onKey(e) {
+      if (!ui || state !== 'open') return;
+      e.stopPropagation(); // the menu is modal: its keys (type-ahead letters too) never reach page shortcuts
+      const rows = level().rows.filter((r) => r.enabled), i = rows.indexOf(lit);
+      kbd = true;
+      if (e.key === 'ArrowDown') { e.preventDefault(); focusRow(i < 0 ? 0 : i + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusRow(i < 0 ? -1 : i - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); focusRow(0); }
+      else if (e.key === 'End') { e.preventDefault(); focusRow(-1); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(lit); }
+      else if (e.key === 'ArrowRight' && lit && lit.item.submenu) { e.preventDefault(); openSub(lit); }
+      else if (e.key === 'ArrowLeft' && ui.levels.length > 1) { e.preventDefault(); closeSub(); }
+      else if (e.key.length === 1 && /\S/.test(e.key)) {
+        // type-ahead: the next item whose label starts with the letter
+        const k = e.key.toLowerCase(), n = rows.length;
+        for (let j = 1; j <= n; j++) { const r = rows[(i + j + n) % n]; if ((r.item.label || '').toLowerCase().startsWith(k)) { focusRow(rows.indexOf(r)); break; } }
+      }
+    }
+    // a click with detail 0 is a keyboard or assistive-technology activation of a <button>
+    const onTriggerClick = (e) => { if (e.detail === 0 && state === 'closed') open({ keyboard: true }); };
+
+    trigger.addEventListener('pointerdown', onTriggerDown);
+    trigger.addEventListener('keydown', onTriggerKey, true);
+    trigger.addEventListener('click', onTriggerClick);
+    return {
+      open: (how) => open(how), close: (how) => close(how),
+      get isOpen() { return state === 'open'; },
+      setItems(items) { o.items = items; if (state === 'open') close({ instant: true }); },
+      destroy() {
+        close({ instant: true }); untrack();
+        trigger.removeEventListener('pointerdown', onTriggerDown); trigger.removeEventListener('keydown', onTriggerKey, true);
+        trigger.removeEventListener('click', onTriggerClick); trigger.removeEventListener('contextmenu', noCtx);
+        trigger.removeAttribute('aria-haspopup'); trigger.removeAttribute('aria-expanded');
+      },
+    };
+  }
+
   root.LiquidUI = {
-    button, toggle, slider, tabs, magnifier, blob, autoMerge, sweep, refreshTouch,
+    button, toggle, slider, tabs, magnifier, menu, blob, autoMerge, sweep, refreshTouch,
     spring, Anim, DampedDrag, PressGlow, VelocityTracker, gesture, invalidate, rubber, onMotion, notify,
   };
 })(window);

@@ -689,6 +689,8 @@
     shadow: 0.16,      // shadow under the group
     margin: 22,        // layer margin around shapes (shadow, stretch), px
     resolution: 0.25,  // density of field pictures: they are smooth and sent to the compositor every frame
+    observe: true,     // rebuild when the container or a member changes size (off for short-lived layers such as a menu)
+    fadeIn: true,      // the first build after a deferred start fades in
   };
 
   // Safari, Firefox and reduced transparency: no SVG filter in backdrop-filter, so no merging. Each member gets
@@ -735,11 +737,21 @@
     filter.setAttribute('primitiveUnits', 'userSpaceOnUse');
     filter.setAttribute('color-interpolation-filters', 'sRGB');
     ensureDefs().appendChild(filter);
-    const members = []; // { el, r, tint, w, h, sUrl, wUrl, bx, by, sImg, wImg }
-    let box = null;
+    const members = []; // { el, r, tint, live, w, h, sUrl, wUrl, bx, by, sImg, wImg }
+    let box = null, knobs = {};
     const padS = () => Math.ceil(o.merge * 5), padW = () => Math.ceil(o.thickness * 5);
 
-    function radiusOf(m, w, h) { return m.r === 'capsule' || m.r == null ? Math.min(w, h) / 2 : m.r; }
+    function radiusOf(m, w, h) {
+      const r = typeof m.r === 'function' ? m.r(w, h) : m.r;
+      return r === 'capsule' || r == null ? Math.min(w, h) / 2 : Math.min(r, w / 2, h / 2);
+    }
+    // a live member is moved and scaled by its own CSS transform every frame (a menu growing out of its button):
+    // its resting box comes from layout (offsets), not from getBoundingClientRect, which includes the transform
+    function restRect(el) {
+      const op = el.offsetParent, q = op ? op.getBoundingClientRect() : { left: 0, top: 0 };
+      const l = q.left + (op ? op.clientLeft : 0) + el.offsetLeft, t = q.top + (op ? op.clientTop : 0) + el.offsetTop;
+      return { left: l, top: t, right: l + el.offsetWidth, bottom: t + el.offsetHeight };
+    }
     // member offset and scale without reading layout: the glass remembers what it was given
     const tfOf = (m) => { const h = m.el.__lg; return h && h.transform ? h.transform : null; };
 
@@ -747,7 +759,7 @@
     function measure() {
       let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
       for (const m of members) {
-        const q = m.el.getBoundingClientRect(), tf = tfOf(m) || { tx: 0, ty: 0 };
+        const q = m.live ? restRect(m.el) : m.el.getBoundingClientRect(), tf = (!m.live && tfOf(m)) || { tx: 0, ty: 0 };
         // centre without the member's own offset, layout size
         const w = m.el.offsetWidth, h = m.el.offsetHeight;
         m.cx = (q.left + q.right) / 2 - tf.tx; m.cy = (q.top + q.bottom) / 2 - tf.ty;
@@ -771,7 +783,7 @@
       if (held) { heldBuild.add(build); return; }
       if (!members.length) { layer.style.display = 'none'; return; }
       // first build after a deferred start: the layer fades in instead of popping
-      if (!built) { built = true; if (heldOnce) layer.classList.add('lg-in'); }
+      if (!built) { built = true; if (heldOnce && o.fadeIn) layer.classList.add('lg-in'); }
       layer.style.display = '';
       const g = measure();
       layer.style.left = '0px'; layer.style.top = '0px';
@@ -792,6 +804,7 @@
       filter.setAttribute('width', f2(g.w)); filter.setAttribute('height', f2(g.h));
       filter.innerHTML = markup();
       members.forEach((m, i) => { m.sImg = filter.querySelector(`feImage[data-s="${i}"]`); m.wImg = filter.querySelector(`feImage[data-w="${i}"]`); });
+      knobs = { veil: filter.querySelector('feFlood[result="vl"]'), blur: filter.querySelector('feGaussianBlur[result="b0"]'), disp: filter.querySelector('feDisplacementMap') };
       layer.style.backdropFilter = layer.style.webkitBackdropFilter = 'none';
       void layer.offsetWidth;
       layer.style.backdropFilter = layer.style.webkitBackdropFilter = `url(#${id})`;
@@ -835,8 +848,8 @@
         m += `<feFlood style="flood-color:${members[i].tint}" flood-opacity="0.7" result="tc${i}"/>`;
         m += `<feComposite in="tc${i}" in2="ta${i}" operator="in" result="t${i}"/>`;
       });
-      if (o.veil && o.veilOpacity > 0) m += `<feFlood style="flood-color:${o.veil}" flood-opacity="${o.veilOpacity}" result="vl"/>`;
-      m += '<feMerge result="ref"><feMergeNode in="ref0"/>' + (o.veil && o.veilOpacity > 0 ? '<feMergeNode in="vl"/>' : '') + tinted.map((i) => `<feMergeNode in="t${i}"/>`).join('') + '</feMerge>';
+      if (o.veil) m += `<feFlood style="flood-color:${o.veil}" flood-opacity="${o.veilOpacity}" result="vl"/>`;
+      m += '<feMerge result="ref"><feMergeNode in="ref0"/>' + (o.veil ? '<feMergeNode in="vl"/>' : '') + tinted.map((i) => `<feMergeNode in="t${i}"/>`).join('') + '</feMerge>';
       m += '<feComposite in="ref" in2="M" operator="in" result="glass0"/>';
       // thickness: the glass is slightly darker at the rim and lightens toward the middle (table over S, black with alpha)
       const inside = (v) => smooth(0.47, 0.52, v);
@@ -894,16 +907,43 @@
       }
     }
 
+    // a data: picture decodes asynchronously; swapping in one that is already decoded avoids a frame without glass
+    const decoded = (url) => { const im = new Image(); im.src = url; return im.decode ? im.decode().catch(() => {}) : Promise.resolve(); };
+
     let ro = null;
-    if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(() => build()); ro.observe(container); }
+    if (o.observe && typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(() => build()); ro.observe(container); }
     const api = {
       layer, options: o,
-      add(el, mo = {}) { members.push({ el, r: mo.radius ?? 'capsule', tint: mo.tint || null }); if (ro) ro.observe(el); build(); return api; },
+      // mo.radius: px, 'capsule' or a function (w, h) => px; mo.live: the member moves by its own transform (see restRect)
+      add(el, mo = {}) { members.push({ el, r: mo.radius ?? 'capsule', tint: mo.tint || null, live: !!mo.live }); if (ro && !mo.live) ro.observe(el); build(); return api; },
       remove(el) { const i = members.findIndex((m) => m.el === el); if (i >= 0) { members.splice(i, 1); if (ro) ro.unobserve(el); build(); } return api; },
       has: (el) => members.some((m) => m.el === el),
       get members() { return members.map((m) => m.el); },
       update, rebuild: build,
       set(p) { Object.assign(o, p); for (const mb of members) mb.sUrl = null; build(); },
+      // cheap per-frame changes of the material, no rebuild: veil density, backdrop blur, refraction depth
+      tune(p) {
+        if (p.veilOpacity != null) { o.veilOpacity = p.veilOpacity; if (knobs.veil) sa(knobs.veil, 'flood-opacity', p.veilOpacity.toFixed(3)); }
+        if (p.blur != null && knobs.blur) { o.blur = Math.max(0.01, p.blur); sa(knobs.blur, 'stdDeviation', o.blur.toFixed(2)); }
+        if (p.refraction != null) { o.refraction = p.refraction; if (knobs.disp) sa(knobs.disp, 'scale', (p.refraction / 0.46).toFixed(2)); }
+      },
+      // new pictures for a member whose layout size or radius changed (a menu growing for its sub-menu),
+      // swapped in once decoded, without rebuilding the filter; resolves when they are in
+      reshape(el) {
+        const m = members.find((x) => x.el === el);
+        if (!m || !m.sImg) return Promise.resolve();
+        const w = el.offsetWidth, h = el.offsetHeight, r = radiusOf(m, w, h);
+        const sUrl = fieldImage(w, h, r, o.merge, padS(), o.resolution), wUrl = fieldImage(w, h, r, o.thickness, padW(), o.resolution);
+        const tok = (m.tok = (m.tok || 0) + 1);
+        return Promise.all([decoded(sUrl), decoded(wUrl)]).then(() => {
+          if (tok !== m.tok || !m.sImg) return;
+          Object.assign(m, { w, h, sUrl, wUrl });
+          m.sImg.setAttribute('href', sUrl); m.wImg.setAttribute('href', wUrl);
+          update();
+        });
+      },
+      // resolves once every member picture is decoded (the glass is really on screen a frame later)
+      ready: () => Promise.all(members.flatMap((m) => [decoded(m.sUrl), decoded(m.wUrl)])),
       destroy() { if (ro) ro.disconnect(); layer.remove(); filter.remove(); members.length = 0; },
     };
     return api;

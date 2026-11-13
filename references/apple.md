@@ -47,7 +47,7 @@ if #available(iOS 26, *) {
 }
 ```
 
-More useful SwiftUI: `.tabBarMinimizeBehavior(.onScrollDown)` on `TabView`, `.scrollEdgeEffectStyle(.soft, for: .top)` for your own bars over scrolling content, `.backgroundExtensionEffect()` so an image extends under the sidebar, `ConcentricRectangle` for concentric corners, `ToolbarSpacer` for toolbar groups. System `Toggle` and `Slider` on iOS 26 already behave like the thumbs in the recipe table; do not build your own.
+More useful SwiftUI: `.tabBarMinimizeBehavior(.onScrollDown)` on `TabView`, `.scrollEdgeEffectStyle(.soft, for: .top)` for your own bars over scrolling content, `.backgroundExtensionEffect()` so an image extends under the sidebar, `ConcentricRectangle` for concentric corners, `ToolbarSpacer` for toolbar groups. System `Toggle` and `Slider` on iOS 26 already behave like the thumbs in the recipe table; do not build your own. The same goes for menus: a SwiftUI `Menu`, a `Picker` with `.pickerStyle(.menu)` or a `UIButton` with `menu` and `showsMenuAsPrimaryAction` already grows out of its button in glass on iOS 26; `LiquidUI.menu` exists only to imitate this on the web.
 
 **UIKit:** `UIGlassEffect` (properties `tintColor`, `isInteractive`) inside a `UIVisualEffectView`; content goes into `contentView`; round it with `cornerRadius` and `clipsToBounds = true`. `UIGlassContainerEffect` with `spacing` combines several elements. Buttons: `UIButton.Configuration.glass()`, `.prominentGlass()`, `.clearGlass()`. **AppKit:** `NSGlassEffectView` and `NSGlassEffectContainerView`. UIKit and AppKit property names come from Apple's documentation and community skills; verify them when building.
 

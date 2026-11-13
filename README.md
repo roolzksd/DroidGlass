@@ -29,15 +29,15 @@ Ask an agent for "liquid glass" and you usually get glassmorphism: a white haze 
 
 - **Real refraction on the web and in Android WebView.** Displacement maps computed from the same formulas as Kyant's Backdrop shader, applied through `backdrop-filter` with SVG filters. Lens, depth, dispersion, specular rim, inner and outer shadows.
 - **Merging glass**, like SwiftUI's `GlassEffectContainer`: nearby shapes melt into one drop with a smooth bridge and split again. One filter for the whole group, tuned to stay cheap on phones.
-- **iOS 26 interaction.** Buttons stretch toward the finger on a rubber band and bounce back, thumbs inflate into lenses and stretch at speed, the tab bar drop magnifies its item and shows neighbours at its rim.
-- **Ready components:** button, toggle, slider, tab bar, magnifier, merge groups. Keyboard and ARIA roles included; respects reduced transparency, contrast and motion.
+- **iOS 26 interaction.** Buttons stretch toward the finger on a rubber band and bounce back, thumbs inflate into lenses and stretch at speed, the tab bar drop magnifies its item and shows neighbours at its rim. Menus grow out of their button as one drop and are picked with a single hold, slide and lift, on springs measured from UIKit.
+- **Ready components:** button, toggle, slider, tab bar, magnifier, pull-down and pop-up menus with sub-menus, merge groups. Keyboard and ARIA roles included; respects reduced transparency, contrast and motion.
 - **Fast startup:** `hold()` / `release()` paints text first and builds glass a frame later; a splash recipe that never stutters.
 - **Graceful fallback:** Safari and Firefox get a soft blur with the same highlights, shadows and springs instead of a broken hole.
 - **Jetpack Compose:** how to use Kyant's Backdrop library correctly, with recipe values from its catalog.
 - **SwiftUI, UIKit, AppKit, widgets:** the real system `glassEffect`, containers, unions, transitions and the rules that keep it looking native.
 - **A checklist and a troubleshooting table**, so the agent checks its own screenshots before handing the work over.
 
-The [live playground](https://roolzksd.github.io/DroidGlass/assets/demo.html) runs every component full screen over switchable backdrops, with a lens lab that turns sliders into copy-ready `LiquidGlass.attach` code and a merge lab for drops you can drag into each other. Best in Chrome or Edge.
+The [live playground](https://roolzksd.github.io/DroidGlass/assets/demo.html) runs every component full screen over switchable backdrops, with a lens lab that turns sliders into copy-ready `LiquidGlass.attach` code and a merge lab for drops you can drag into each other, and glass menus to hold and slide through. Best in Chrome or Edge.
 
 Zero dependencies, no build step: three plain files (about 115 KB unminified) the agent copies into your project.
 
@@ -90,6 +90,7 @@ The skill triggers by itself when you ask for glass. For example:
 - "Make the bottom bar and the add button liquid glass, like iOS 26."
 - "Our Capacitor app needs glass toggles and a slider that feel like Apple's."
 - "Add merging glass buttons to this toolbar."
+- "Give the ••• button a glass dropdown menu like in iOS 26."
 - "Redo this Compose screen's bottom tabs with Liquid Glass."
 - "Make this SwiftUI toolbar use the new glass, with the buttons merging when they get close."
 
@@ -109,7 +110,7 @@ The skill triggers by itself when you ask for glass. For example:
 ```
 SKILL.md                      entry point the agent reads first: workflow, Apple's rules, recipes, checklist
 references/
-  web.md                      how the engine works, every option, components, merging, startup
+  web.md                      how the engine works, every option, components, menus, merging, startup
   troubleshooting.md          symptom → fix table
   performance.md              why SVG filters get slow on phones and how to count it
   math-and-motion.md          lens, dispersion, highlight math; springs and gestures
@@ -156,6 +157,7 @@ The banner at the top is not a mock-up: it is `media/hero.html`, a page that use
 
 - [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) (Apache-2.0): Backdrop library and catalog. The web engine ports its lens, dispersion, highlight and shadow formulas and its spring constants.
 - [iyinchao/liquid-glass-studio](https://github.com/iyinchao/liquid-glass-studio) (MIT): the merging scheme behind `LiquidGlass.group`.
+- [facebook/astryx](https://github.com/facebook/astryx) (MIT): UIKit springs and gesture thresholds for menus, measured on iOS 26.2.
 - kube.io, "Liquid Glass in the Browser": refraction through `feDisplacementMap` in `backdrop-filter`.
 - Apple Human Interface Guidelines and WWDC25 "Meet Liquid Glass".
 
