@@ -962,9 +962,16 @@
       const e = clamp(s, 0, 1);
       const PL = u.L + (W * (1 - k)) / 2, PT = u.T + (u.down ? 0 : H * (1 - k)), PW = W * k, PH = H * k;
       const rl = lerp(u.tr.l, PL, e), rt = lerp(u.tr.t, PT, e), rw = lerp(u.tr.w, PW, e), rh = lerp(u.tr.h, PH, e);
-      const rr = lerp(Math.min(rw, rh) / 2, u.R * k, smoothstep(0.45, 1, e));
-      const full = e > 0.999 && k > 0.9999;
-      u.panel.style.clipPath = full ? '' : `inset(${(rt - u.T).toFixed(2)}px ${(u.L + W - rl - rw).toFixed(2)}px ${(u.T + H - rt - rh).toFixed(2)}px ${(rl - u.L).toFixed(2)}px round ${rr.toFixed(2)}px)`;
+      let rh2 = rh;
+      // Under a card that reaches past the menu's bottom the menu's glass ends just below the card's top: its edge
+      // would otherwise show through the card's glass as a hard band (its rounded bottom stays just above the card)
+      if (c0) {
+        const pc = clamp(c0.p.value, 0, 1.2), ct = lerp(c0.srcT, c0.T, pc), cb = ct + Math.max(1, lerp(c0.srcH, c0.H, pc));
+        if (cb >= rt + rh - 1) rh2 = Math.max(Math.min(rh, ct + 1 - rt), 2 * u.R * k);
+      }
+      const rr = Math.min(lerp(Math.min(rw, rh) / 2, u.R * k, smoothstep(0.45, 1, e)), rh2 / 2);
+      const full = e > 0.999 && k > 0.9999 && rh2 === rh;
+      u.panel.style.clipPath = full ? '' : `inset(${(rt - u.T).toFixed(2)}px ${(u.L + W - rl - rw).toFixed(2)}px ${(u.T + H - rt - rh2).toFixed(2)}px ${(rl - u.L).toFixed(2)}px round ${rr.toFixed(2)}px)`;
       // content: scaled into the rect from its top-left, fading in from a light blur (s may overshoot a little)
       const sc = Math.max(0.01, (rw / W) * (s > 1 ? s : 1));
       u.body.style.transform = full && s < 1.0005 ? '' : `translate(${(rl - u.L).toFixed(2)}px, ${(rt - u.T).toFixed(2)}px) scale(${sc.toFixed(4)})`;
@@ -975,7 +982,7 @@
       if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
       if (u.grp && u.grp.layer && u.lq) {
         const q = u.lq, ly = u.grp.layer;
-        ly.style.clipPath = full ? '' : `inset(${(rt - q.top).toFixed(2)}px ${(q.right - rl - rw).toFixed(2)}px ${(q.bottom - rt - rh).toFixed(2)}px ${(rl - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
+        ly.style.clipPath = full ? '' : `inset(${(rt - q.top).toFixed(2)}px ${(q.right - rl - rw).toFixed(2)}px ${(q.bottom - rt - rh2).toFixed(2)}px ${(rl - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
         ly.style.opacity = smoothstep(0, 0.12, s).toFixed(3);
       } else if (!u.grp) u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
       // sub-menu cards, each its own glass in front of the level below
