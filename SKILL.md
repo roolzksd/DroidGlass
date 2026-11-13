@@ -147,7 +147,7 @@ Screenshots at scale 2, look at them yourself:
 7. **Fallback:** fake the engine (Safari user agent and empty `navigator.userAgentData`) and check that elements did not turn into holes and icons under the tab bar thumb are not blurred.
 8. **Resize and rotation:** the map is rebuilt, no stair steps on the rim.
 9. **Screen transitions:** capture several consecutive frames while a screen enters; glass buttons are never darker than at rest, merge layers stay exactly under their buttons after the animation.
-10. **Menu:** frames of the entrance show a drop flowing out of the button, never an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a sub-menu card grows from its row without being cut off; the menu stays inside the screen from a button in every corner.
+10. **Menu:** frames of the entrance show a drop flowing out of the button, never an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a sub-menu is its own glass panel that grows from its row and may reach past the menu, the menu behind keeps its size, and a tap on it goes back; the menu stays inside the screen from a button in every corner.
 11. **No console errors** and no hangs: after a burst of taps the page responds as fast. One animation loop, no stray `requestAnimationFrame`s.
 12. No more than 3 large glass elements on a phone screen, no glass on glass, no glass content.
 

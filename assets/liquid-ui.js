@@ -911,22 +911,16 @@
       let grp = null;
       const g = Object.assign(menuGlass(dk), o.glass || {}), target = { veil: g.veilOpacity, blur: g.blur, refr: g.refraction };
       if (refract) {
-        // headroom for a sub-menu that grows the panel: its card starts at its row (estimated from row height)
-        const extra = Math.max(0, ...lvl.rows.filter((r) => r.item.submenu).map((r) => {
-          const n = normItems(r.item.submenu).length + 1, rh = r.el.offsetHeight;
-          return r.el.getBoundingClientRect().top - panel.getBoundingClientRect().top + n * rh + 30 - H;
-        }));
-        g.margin += Math.min(extra, maxH);
         grp = LG.group(layer, g);
         grp.add(proxy, { radius: tr, live: true });
         grp.add(panel, { radius: () => ui ? ui.R : R, live: true });
         grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
       } else panel.classList.add('lgu-menu--frost');
       ui = {
-        layer, catcher, proxy, panel, glow, body, grp, refract, dk, R, W, H, H0: H, L, T: Tp, maxH,
+        layer, catcher, proxy, panel, glow, body, grp, refract, dk, R, W, H, H0: H, L, T: Tp, maxH, g, subs: [],
         ax: T.left + T.width / 2 - L, ay: T.top + T.height / 2 - Tp, // anchor: the button's centre in panel space
         veil: target.veil, blur: target.blur, refr: target.refr,
-        levels: [{ host: body, rows: lvl.rows, hl: lvl.hl }], hA: new Anim(H, inv), dy: new Anim(0, inv), shapeBusy: false, shapeH: H, curH: H, dim: 1,
+        levels: [{ host: body, surface: panel, rows: lvl.rows, hl: lvl.hl }], hA: new Anim(H, inv), dy: new Anim(0, inv), shapeBusy: false, shapeH: H, curH: H, dim: 1,
       };
       catcher.addEventListener('pointerdown', onCatchDown);
       catcher.addEventListener('wheel', () => close(), { passive: true });
@@ -942,6 +936,7 @@
     function render() {
       if (!ui) return;
       const u = ui, s = sA.value, W = u.W, H = u.hA.value;
+      u.dim = u.subs.reduce((d, sb) => Math.min(d, lerp(1, 0.4, clamp(sb.sA.value, 0, 1))), 1); // the menu behind a sub-menu dims
       if (Math.abs(H - u.curH) > 0.01) { u.curH = H; u.panel.style.height = H.toFixed(2) + 'px'; reshape(); }
       // growth about the anchor, then the stretch toward a finger held outside
       let l = u.ax * (1 - s), t = u.ay * (1 - s) + u.dy.value, w = W * s, h = H * s;
@@ -960,6 +955,22 @@
         u.grp.tune({ veilOpacity: u.veil * smoothstep(0.06, 0.6, s), blur: lerp(1, u.blur, smoothstep(0, 0.7, s)), refraction: lerp(18, u.refr, smoothstep(0, 1, s)) });
         u.grp.update();
       } else u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
+      // sub-menu panels, each its own glass in front of the menu
+      for (const sb of u.subs) {
+        const k = sb.sA.value, c = clamp(k, 0, 1.2);
+        const l = lerp(sb.rx, sb.L, c), t = lerp(sb.ry, sb.T, c), w = lerp(sb.rw, sb.W, c), h = lerp(sb.rh, sb.H, c);
+        sb.el.style.transform = `translate(${(l - sb.L).toFixed(2)}px, ${(t - sb.T).toFixed(2)}px) scale(${(w / sb.W).toFixed(4)}, ${(h / sb.H).toFixed(4)})`;
+        const e = smoothstep(0.1, 1, k);
+        sb.el.style.boxShadow = `0 ${(18 * e).toFixed(1)}px ${(50 * e).toFixed(1)}px rgb(0 0 0 / ${(0.22 * e).toFixed(3)}), 0 ${(2 * e).toFixed(1)}px ${(8 * e).toFixed(1)}px rgb(0 0 0 / ${(0.06 * e).toFixed(3)})`;
+        const so = smoothstep(0.35, 0.9, k);
+        sb.body.style.opacity = so.toFixed(3);
+        sb.body.style.filter = so < 0.999 ? `blur(${((1 - so) * 4).toFixed(2)}px)` : '';
+        if (sb.grp) {
+          sb.grp.tune({ veilOpacity: sb.veil * smoothstep(0.05, 0.6, k), blur: lerp(1, u.blur, smoothstep(0, 0.7, k)), refraction: lerp(18, u.refr, smoothstep(0, 1, k)) });
+          sb.grp.update();
+          if (sb.grp.layer) sb.grp.layer.style.opacity = smoothstep(0, 0.12, k).toFixed(3);
+        } else sb.el.style.opacity = smoothstep(0, 0.3, k).toFixed(3);
+      }
       // highlight platter and finger glow
       const lv = u.levels[u.levels.length - 1], hs = lv.hl.style;
       hs.transform = `translate(${hlA.x.value.toFixed(2)}px, ${hlA.y.value.toFixed(2)}px)`;
@@ -1005,6 +1016,7 @@
       state = 'closing';
       const u = ui;
       light(null); glowA.animateTo(0, MENU.fade); stx.animateTo(0, BOUNCE); sty.animateTo(0, BOUNCE);
+      for (const sb of u.subs) { sb.gone = true; sb.sA.animateTo(0, MENU.close); }
       trigger.setAttribute('aria-expanded', 'false'); trigger.removeAttribute('aria-controls');
       root.removeEventListener('keydown', onDocKey, true);
       root.removeEventListener('resize', onWinChange); root.removeEventListener('scroll', onScroll, true);
@@ -1013,6 +1025,7 @@
         if (ui !== u) return;
         setTriggerGlass(true);
         if (u.grp) u.grp.destroy();
+        for (const sb of u.subs) if (sb.grp) sb.grp.destroy();
         u.layer.remove(); ui = null; state = 'closed';
         if (hadFocus || how.focus) trigger.focus({ preventScroll: true });
         if (o.onClose) o.onClose();
@@ -1028,7 +1041,7 @@
       until(() => sA.value < 0.08 || ui !== u).then(finish);
     }
     const onWinChange = () => close({ instant: true });
-    const onScroll = (e) => { if (ui && !ui.panel.contains(e.target)) close({ instant: true }); };
+    const onScroll = (e) => { if (ui && !ui.layer.contains(e.target)) close({ instant: true }); };
 
     // ---------- rows: hit testing, highlight, actions ----------
     const level = () => ui.levels[ui.levels.length - 1];
@@ -1036,7 +1049,8 @@
       for (const r of level().rows) { const q = r.el.getBoundingClientRect(); if (x >= q.left && x < q.right && y >= q.top && y < q.bottom) return r; }
       return null;
     }
-    function inPanel(x, y) { const q = ui.panel.getBoundingClientRect(); return x >= q.left && x < q.right && y >= q.top && y < q.bottom; }
+    const inRect = (el, x, y) => { const q = el.getBoundingClientRect(); return x >= q.left && x < q.right && y >= q.top && y < q.bottom; };
+    function inPanel(x, y) { return inRect(ui.panel, x, y) || ui.subs.some((sb) => !sb.gone && inRect(sb.el, x, y)); }
     function light(r) {
       if (r && !r.enabled) r = null;
       if (r === lit) return;
@@ -1064,43 +1078,64 @@
       if (o.onSelect) o.onSelect(it);
     }
 
-    // ---------- sub-menu: drills in place, a card grows down from its row ----------
+    // ---------- sub-menu: its own glass panel in front of the menu ----------
+    // The menu behind keeps its size and dims; the sub-menu grows out of its row and may reach past the
+    // menu's edges (it is lifted toward the viewer, so it is a little wider). A tap on the menu behind goes back.
     function openSub(r) {
-      const u = ui, parent = level(), pad = 6;
-      const card = document.createElement('div'); card.className = 'lgu-menu-card'; card.setAttribute('role', 'menu');
-      const lvl = menuRows(card, r.item.submenu, 'large', r.item.label);
-      u.panel.appendChild(card);
-      const ph = u.panel.getBoundingClientRect(), rq = r.el.getBoundingClientRect(), k = ph.height / u.hA.value || 1;
-      const rowTop = (rq.top - ph.top) / k, rowH = r.el.offsetHeight;
-      card.style.width = u.W - 2 * pad + 'px';
-      const cardH = card.offsetHeight;
-      let top = rowTop, need = Math.max(u.hA.target, top + cardH + pad);
-      if (need > u.maxH) { need = u.maxH; top = Math.max(pad, need - pad - cardH); }
-      const lv = { host: card, rows: lvl.rows, hl: lvl.hl, card, top, cardH, rowH, parent, need0: u.hA.target };
+      const u = ui, parent = level(), m = MENU.margin, pad = 6;
+      const wrap = document.createElement('div'); wrap.className = 'lgu-menu-subwrap';
+      const el = document.createElement('div'); el.className = 'lgu-menu lgu-menu-sub'; el.setAttribute('role', 'menu'); el.tabIndex = -1;
+      el.setAttribute('aria-label', r.item.label);
+      const body = document.createElement('div'); body.className = 'lgu-menu-body';
+      el.appendChild(body); wrap.appendChild(el); u.layer.appendChild(wrap);
+      const lvl = menuRows(body, r.item.submenu, 'large', r.item.label);
+      el.style.width = 'max-content';
+      const W = Math.round(clamp(Math.max(el.offsetWidth, u.W + 16), o.minWidth, Math.min(o.maxWidth + 16, vw() - 8)));
+      el.style.width = W + 'px';
+      const maxH = vh() - 2 * m, H = Math.min(el.offsetHeight, maxH);
+      body.style.maxHeight = maxH + 'px';
+      const rq = r.el.getBoundingClientRect(), pq = u.panel.getBoundingClientRect();
+      // its title row lands on the row that opened it; then it is kept on screen
+      let L = clamp(pq.left + (pq.width - W) / 2, 4, vw() - 4 - W);
+      let T = clamp(rq.top - pad, m, vh() - m - H);
+      const Rr = Math.min(o.radius, W / 2, H / 2);
+      Object.assign(el.style, { left: L + 'px', top: T + 'px', height: H + 'px', borderRadius: Rr + 'px' });
+      const sb = { wrap, el, body, L, T, W, H, R: Rr, rx: rq.left, ry: rq.top, rw: rq.width, rh: rq.height, grp: null, gone: false,
+        veil: Math.min(0.85, u.veil + 0.08) };
+      if (u.refract) {
+        const g = Object.assign({}, u.g, { observe: false, fadeIn: false });
+        sb.grp = LG.group(wrap, g);
+        sb.grp.add(el, { radius: Rr, live: true });
+        sb.grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
+      } else el.classList.add('lgu-menu--frost');
+      sb.sA = new Anim(0, inv);
+      u.subs.push(sb);
+      const lv = { host: body, surface: el, rows: lvl.rows, hl: lvl.hl, sub: sb, parent };
       parent.hl.style.opacity = '0'; lit = null; hlA.op.snapTo(0);
-      u.levels.push(lv);
-      Object.assign(card.style, { top: top + 'px', height: rowH + 'px' });
       parent.host.style.pointerEvents = 'none';
-      // the parent's rows recede to half opacity as the card grows (measured: 1 -> 0.5)
-      const cH = new Anim(rowH, () => { card.style.height = cH.value.toFixed(2) + 'px'; card.style.opacity = smoothstep(rowH, rowH + 24, cH.value).toFixed(3); u.dim = lerp(1, 0.5, smoothstep(rowH, cardH, cH.value)); inv(); });
-      lv.cH = cH;
-      card.style.opacity = '0';
-      cH.animateTo(cardH, MENU.sub);
-      // keep the panel on screen while it grows
-      const over = u.T + need + u.dy.target - (vh() - MENU.margin);
-      if (over > 0) u.dy.animateTo(u.dy.target - over, MENU.sub);
-      if (need > u.hA.target) u.hA.animateTo(need, MENU.sub);
-      light(null);
+      u.levels.push(lv);
+      glowA.animateTo(0, MENU.fade); stx.animateTo(0, BOUNCE); sty.animateTo(0, BOUNCE);
+      el.addEventListener('pointerdown', onPanelDown);
+      el.addEventListener('pointermove', (e) => { if (!press && e.pointerType === 'mouse' && level() === lv) { kbd = false; light(rowAt(e.clientX, e.clientY)); } });
+      el.addEventListener('pointerleave', (e) => { if (!press && e.pointerType === 'mouse' && !kbd && level() === lv) light(null); });
+      el.addEventListener('keydown', onKey);
+      el.addEventListener('contextmenu', noCtx);
+      if (reduceMotion()) sb.sA.snapTo(1); else sb.sA.animateTo(1, MENU.sub);
+      render();
+      el.focus({ preventScroll: true });
       if (kbd) setTimeout(() => focusRow(1), 0);
     }
     function closeSub() {
       const u = ui, lv = u.levels.length > 1 ? u.levels.pop() : null;
       if (!lv) return;
+      const sb = lv.sub;
       light(null);
-      lv.parent.host.style.pointerEvents = ''; lv.card.style.pointerEvents = 'none'; // the shrinking card never takes a tap meant for the parent
-      lv.cH.animateTo(lv.rowH, MENU.back).then(() => lv.card.remove());
-      if (u.hA.target !== lv.need0) u.hA.animateTo(lv.need0, MENU.back);
-      if (u.dy.target !== 0 && u.levels.length === 1) u.dy.animateTo(0, MENU.back);
+      sb.gone = true; sb.el.style.pointerEvents = 'none'; // the shrinking panel never takes a tap meant for the menu
+      lv.parent.host.style.pointerEvents = '';
+      const done = () => { if (sb.grp) sb.grp.destroy(); sb.wrap.remove(); u.subs = u.subs.filter((x) => x !== sb); inv(); };
+      if (reduceMotion()) { sb.sA.snapTo(0); done(); }
+      else { sb.sA.animateTo(0, MENU.back); until(() => sb.sA.value < 0.02 || ui !== u).then(done); }
+      (u.levels.length > 1 ? level().surface : u.panel).focus({ preventScroll: true });
       if (kbd) setTimeout(() => focusRow(0), 0);
     }
 
@@ -1127,6 +1162,7 @@
     function scrub(x, y) {
       if (!ui || state !== 'open') return;
       light(rowAt(x, y));
+      if (ui.levels.length > 1) { autoScroll(); return; } // a sub-menu: rows light, no glow or stretch
       const q = ui.panel.getBoundingClientRect(), k = q.width / ui.W || 1;
       ui.panel.style.setProperty('--mx', ((x - q.left) / k).toFixed(1) + 'px');
       ui.panel.style.setProperty('--my', ((y - q.top) / k).toFixed(1) + 'px');
@@ -1142,9 +1178,9 @@
     // a finger resting near the top or bottom of a menu that scrolls scrolls it, and the lit row follows
     function autoScroll() {
       if (!press || !press.handed || !ui) return;
-      const b = level().host === ui.body ? ui.body : null;
+      const b = level().host;
       if (!b || b.scrollHeight <= b.clientHeight + 1) return;
-      const q = ui.panel.getBoundingClientRect(), zone = 32;
+      const q = level().surface.getBoundingClientRect(), zone = 32;
       const v = press.y < q.top + zone ? -(q.top + zone - press.y) : press.y > q.bottom - zone ? press.y - (q.bottom - zone) : 0;
       if (!v || press.y < q.top - 8 || press.y > q.bottom + 8) return;
       b.scrollTop += clamp(v, -zone, zone) * 0.5;
@@ -1164,10 +1200,11 @@
     function onPanelDown(e) {
       if (e.button > 0 || press) return;
       if (entering()) { e.preventDefault(); return; } // a tap while the menu grows does nothing (iOS)
+      if (e.currentTarget !== level().surface) { e.preventDefault(); closeSub(); return; } // the menu behind a sub-menu: back
       if (e.pointerType === 'mouse') e.preventDefault();
       kbd = false;
       track(e, 'panel');
-      try { ui.panel.setPointerCapture(e.pointerId); } catch (_) {}
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
       scrub(e.clientX, e.clientY); // rows that fit light up on touch-down
     }
     function onMove(e) {

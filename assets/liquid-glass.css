@@ -82,13 +82,13 @@
 /* ---------- menu (LiquidUI.menu): the glass is the group layer under the panel; the panel only holds content ---------- */
 .lgu-menu-layer {
   --lgu-menu-ink: #0B0B0D; --lgu-menu-hl: rgb(0 0 0 / .075); --lgu-menu-sep: rgb(60 60 67 / .2);
-  --lgu-menu-red: #FF3B30; --lgu-menu-card: rgb(253 253 254 / .97); --lgu-menu-frost: rgb(246 246 248 / .8);
+  --lgu-menu-red: #FF3B30; --lgu-menu-frost: rgb(246 246 248 / .8);
   position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
   font-family: inherit; -webkit-tap-highlight-color: transparent;
 }
 .lgu-menu-layer.lgu-dark {
   --lgu-menu-ink: #F5F5F7; --lgu-menu-hl: rgb(255 255 255 / .12); --lgu-menu-sep: rgb(235 235 245 / .16);
-  --lgu-menu-red: #FF453A; --lgu-menu-card: rgb(52 52 57 / .97); --lgu-menu-frost: rgb(30 30 34 / .78);
+  --lgu-menu-red: #FF453A; --lgu-menu-frost: rgb(30 30 34 / .78);
 }
 .lgu-menu-catch { position: absolute; inset: 0; pointer-events: auto; }
 .lgu-menu-proxy { position: absolute; pointer-events: none; transform-origin: 50% 50%; }
@@ -127,13 +127,8 @@
 .lgu-menu-row .lgu-menu-item { flex-direction: column; justify-content: center; gap: 6px; min-height: 70px; padding: 8px 4px; font-size: 13px; font-weight: 500; text-align: center; border-radius: 18px; }
 .lgu-menu-row .lgu-mi-label { flex: none; max-width: 100%; }
 .lgu-menu-row.lgu-small .lgu-menu-item { min-height: 50px; }
-/* sub-menu card laid over the parent's rows; it grows down from the row that opened it */
-.lgu-menu-card {
-  position: absolute; left: 6px; z-index: 2; overflow: hidden; box-sizing: border-box; padding: 6px 0;
-  border-radius: 20px; background: var(--lgu-menu-card); box-shadow: 0 8px 26px rgb(0 0 0 / .12);
-}
-.lgu-menu-card > .lgu-menu-item, .lgu-menu-card > .lgu-menu-sep { margin-left: 6px; margin-right: 6px; }
-.lgu-menu-card > .lgu-menu-sep { margin-left: 20px; margin-right: 20px; }
+/* a sub-menu is its own glass panel in front of the menu; the wrapper holds its glass layer under it */
+.lgu-menu-subwrap { position: absolute; inset: 0; pointer-events: none; }
 @media (pointer: fine) {
   .lgu-menu-item { min-height: 36px; font-size: 15px; }
   .lgu-menu-row .lgu-menu-item { min-height: 60px; font-size: 12px; }
