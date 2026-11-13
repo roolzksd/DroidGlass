@@ -54,7 +54,7 @@ From the Human Interface Guidelines, WWDC25 "Meet Liquid Glass" and popular comm
 | Dialog, radius 48 | brightness 0.2 (light), saturation 1.5, blur 16 (dark 8), lens(24, 48, depth) | Plain | dims the backdrop #29293A 23% (dark #121212 56%) |
 | Control centre tile | vibrancy, lens(24, 48, depth) | Default, angle from device tilt, falloff 2 | enter: 48 dp offset and alpha |
 | Magnifier 128×96 | lens(8, 24, depth, dispersion), backdrop zoomed 1.5x | inner shadow 16 | drag |
-| Menu (web, `LiquidUI.menu`)* | merge group: blur 10, refraction 34, rim 16, saturation 1.7, page-coloured veil 74% (dark 64%), radius 32 | glare 0.6, specular line 0.7, rim shading; a faint shadow 0 8 36 at 10% (none under a sub-menu card) | pops open out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide, the highlight pill slides between rows |
+| Menu (web, `LiquidUI.menu`)* | merge group: blur 10, refraction 34, rim 16, saturation 1.7, page-coloured veil 74% (dark 64%), radius 32 | glare 0.6, specular line 0.7, rim shading; a faint shadow 0 8 36 at 10% (none under a sub-menu card) | pops open out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide, the highlight pill slides between rows. `motion: 'grow'`: grows from under the button (scale 0.8 / 0.405 s, centre 0.94 / 0.22 s down and 0.82 / 0.34 s sideways), closes in 120 ms |
 
 \* Not from Kyant: the springs and gesture thresholds are measured from UIKit on iOS 26.2 (astryx), the material is matched to iOS screenshots by eye.
 
@@ -87,6 +87,8 @@ Copy the three files from `assets/` into the project unchanged and configure the
       { label: 'Sort By', submenu: [{ label: 'Name', checked: true }, { label: 'Date', checked: false }] },
       { label: 'Delete', role: 'destructive', onSelect: () => {} }],
   });
+  // or grown from under the button, as native Android menus do (curves measured frame by frame); the button sinks under the finger
+  // LiquidUI.button(btn, { stretch: false, press: 'shrink' }); LiquidUI.menu(btn, { motion: 'grow', items: [...] });
   // merging: a bar and a button next to it melt into one drop; neighbouring stretchy buttons do it by themselves
   // LiquidUI.blob([tabs.panel, fab], { blur: 3.5 }); LiquidUI.autoMerge(document.body); after a screen change LiquidUI.sweep()
   // bare glass for your own markup
@@ -147,7 +149,7 @@ Screenshots at scale 2, look at them yourself:
 7. **Fallback:** fake the engine (Safari user agent and empty `navigator.userAgentData`) and check that elements did not turn into holes and icons under the tab bar thumb are not blurred.
 8. **Resize and rotation:** the map is rebuilt, no stair steps on the rim.
 9. **Screen transitions:** capture several consecutive frames while a screen enters; glass buttons are never darker than at rest, merge layers stay exactly under their buttons after the animation.
-10. **Menu:** frames of the entrance show a round bubble popping out of the button, never a small box, an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a press inside the open menu and a slide moves the highlight pill smoothly from row to row (no `pointercancel`); a sub-menu is a glass card whose header lands on its row and which may reach past the menu, the menu behind keeps its size, recedes slightly and dims, and a tap on it goes back; the menu stays inside the screen from a button in every corner.
+10. **Menu:** frames of the entrance show a round bubble popping out of the button, never a small box, an empty frame or a lens circle inside the open menu; hold, slide and lift on a row picks it; a press inside the open menu and a slide moves the highlight pill smoothly from row to row (no `pointercancel`); a sub-menu is a glass card whose header lands on its row and which may reach past the menu, the menu behind keeps its size, recedes slightly and dims, and a tap on it goes back; the menu stays inside the screen from a button in every corner. With `motion: 'grow'`: the first frames start at the button's bottom edge under its outer side, the menu drops first and spreads after, the text arrives just behind the glass, no frame shows the glass cut by a straight edge, and the close is gone in about 120 ms.
 11. **No console errors** and no hangs: after a burst of taps the page responds as fast. One animation loop, no stray `requestAnimationFrame`s.
 12. No more than 3 large glass elements on a phone screen, no glass on glass, no glass content.
 

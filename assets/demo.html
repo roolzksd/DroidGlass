@@ -289,8 +289,9 @@
           <div class="mns">
             <button class="gbtn more" id="more" aria-label="More"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
             <button class="gbtn pop" id="pop" aria-label="Lens preset"><span id="pop-label">Default</span><svg viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg></button>
+            <button class="gbtn more" id="more2" aria-label="More (grow motion)"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
           </div>
-          <span class="tag">LiquidUI.menu</span>
+          <span class="tag">LiquidUI.menu · morph · grow</span>
         </div>
       </div>
       <div class="lens-slot">
@@ -670,6 +671,20 @@
       return [...Object.keys(PRESETS).map((n) => ({ label: n, checked: cur === n, onSelect: () => setLens(PRESETS[n]) })), '-',
         { label: 'Default', checked: cur === 'Default', onSelect: () => setLens(DEFAULT) }];
     },
+  });
+
+  // motion 'grow': the menu grows from under the button, curves measured on a native Android menu
+  LiquidUI.button($('more2'), { stretch: false, press: 'shrink' });
+  LiquidUI.menu($('more2'), {
+    motion: 'grow',
+    items: () => [
+      { label: 'Backdrop', sub: names[sceneIndex], icon: I(icons[names[sceneIndex]]), submenu: names.map((n, i) => ({ label: n, checked: i === sceneIndex, keepOpen: true, onSelect: () => goScene(i) })) },
+      '-',
+      { label: 'Animate backdrop', checked: animT.checked, keepOpen: true, onSelect: () => setAnim(!animT.checked) },
+      { label: 'API labels', checked: !document.body.classList.contains('notags'), keepOpen: true, onSelect: () => setTags(document.body.classList.contains('notags')) },
+      '-',
+      { label: 'Copy code', icon: I('M9 9h11v11H9zM5 15H4V4h11v1'), onSelect: () => copyText($('copy-code').dataset.copy) },
+    ],
   });
 
   // ---------- keys ----------

@@ -63,8 +63,14 @@ Measured from UIKit on the iOS 26.2 simulator by the astryx project (MIT). UIKit
 | Hold before the menu opens under a finger | 150 ms; about 300 ms inside a scrolling view | |
 | Drift allowed during the hold | 13 px (UIKit opened at 12 pt, not at 14) | |
 | Travel before a held finger starts picking | 10 px | |
+| `motion: 'grow'` open: scale from 0 | 0.8, response 0.405 s (+1.6 % at about 340 ms) | 0.8, 241 |
+| `motion: 'grow'` open: centre, vertical / sideways | 0.94, 0.22 s / 0.82, 0.34 s | 0.94, 816 / 0.82, 342 |
+| `motion: 'grow'` open: glass / text opacity | critically damped 0.27 s from +12 ms / 0.28 s from +38 ms | |
+| `motion: 'grow'` close: scale toward 0 | 1, response 0.22 s; removed at 0.15 (about 120 ms) | 1, 816 |
+| `motion: 'grow'` close: centre to the button's centre, sideways / up | 1, 0.19 s / 1, 0.39 s | 1, 1094 / 1, 260 |
+| Button `press: 'shrink'` | 0.92 in, critically damped 0.15 s; out on 0.6, 0.3 s (+1 %) | 1, 1755 / 0.6, 439 |
 
-The 0.971 recede is from native iOS captures (416 → 404 px) published by liquid_glass_widgets (MIT); the 0.5 dim is astryx's measurement. Not measured anywhere and chosen by eye: the round drop the menu pops out of (it rests at the panel's smaller side minus 16 px and melts into the panel between 0.8 and 1 of the growth), the 20 px rubber band toward a finger held outside, and the highlight fade (1, 1500).
+The 0.971 recede is from native iOS captures (416 → 404 px) published by liquid_glass_widgets (MIT); the 0.5 dim is astryx's measurement. The `grow` rows are measured frame by frame from a 60 fps capture of a native Android pull-down menu (6 opens, 6 closes) by fitting damped springs to the panel's scale, centre and opacity. Not measured anywhere and chosen by eye: the round drop the menu pops out of (it rests at the panel's smaller side minus 16 px and melts into the panel between 0.8 and 1 of the growth), the 20 px rubber band toward a finger held outside, and the highlight fade (1, 1500).
 
 In the original the velocity in the drop formula keeps its sign, so moving left squeezes the thumb. The web code uses the absolute velocity, so the drop stretches the same both ways. On Android keep Kyant's behaviour or change it the same way if the user notices.
 

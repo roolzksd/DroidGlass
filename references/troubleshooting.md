@@ -44,3 +44,5 @@
 | The menu jumps or picks the wrong row right after it opens | taps during the entrance must be ignored and a held finger must travel 10 px before it picks |
 | The menu's glass is a flat grey (light theme) or flat dark, nothing of the page shows through | an element with `mix-blend-mode` (the finger glow) inside a panel without its own stacking context isolates the whole overlay, which becomes a backdrop root, so the glass under it samples black; give the panel `isolation: isolate` |
 | The menu behind a sub-menu shows through the card as a band | the card's material must be denser than the menu's (more blur and veil) so the menu behind melts into a soft tint; do not cut the menu behind |
+| A scaled menu (`motion: 'grow'`) shows its glass clear or stuck at the first frame on a phone | do not scale or move the glass during the growth: draw it once at full size, clip it to the growing rect and scale only the content; move the glass layer only for the last few px (the overshoot) |
+| A clipped growing menu has no edge until it arrives | the glass draws its rim only at its own outline; scale a thin CSS edge with the content and fade it out as the panel arrives |

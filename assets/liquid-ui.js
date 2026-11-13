@@ -117,6 +117,8 @@
   // A stiff spring (300 and up) on a large stretch looks like a snap with no animation.
   const BOUNCE = spring(0.5, 170, 0.05);
   const PRESS_GLOW = spring(0.5, 300, 0.001);
+  // a button that sinks under the finger: in critically damped over 0.15 s, out over 0.3 s with a 0.6 damping ratio
+  const SINK = { down: spring(1, Math.pow((2 * Math.PI) / 0.15, 2), 0.001), up: spring(0.6, Math.pow((2 * Math.PI) / 0.3, 2), 0.001) };
 
   // who follows glass movement (merge groups); called in the same frame
   const motionWatch = new WeakMap();
@@ -305,7 +307,7 @@
   // about 1.6x the short side, scaled by reach) and stays stretched until release: it never tears away by itself.
   // After release it springs back with overshoot. Released outside the button: no click.
   function button(el, opts) {
-    const o = Object.assign({ tint: null, surface: null, interactive: true, onClick: null, glass: {}, stretch: true, yieldScroll: false, reach: 0.36 }, opts);
+    const o = Object.assign({ tint: null, surface: null, interactive: true, onClick: null, glass: {}, stretch: true, yieldScroll: false, reach: 0.36, press: 'grow' }, opts);
     el.classList.add('lgu-button');
     if (!el.hasAttribute('role') && el.tagName !== 'BUTTON') { el.setAttribute('role', 'button'); el.tabIndex = 0; }
     const glass = LG.attach(el, Object.assign({ radius: 'capsule', blur: 2, saturation: 1.5, refractionHeight: 12, refractionAmount: 24, tint: o.tint, surface: o.surface, highlight: 'default', depth: 1 }, o.glass));
@@ -318,6 +320,9 @@
     el.addEventListener('contextmenu', noMenu);
     el.__lgGhost = (on) => glass.set({ ghost: on }); // a merge group takes over drawing the glass
     const glow = new PressGlow(() => invalidate(render));
+    // press 'shrink': the button sinks to 0.92 under the finger and springs back with a slight overshoot
+    // (measured on a native Android menu button: 0.92 in about 80 ms, back in about 180 ms, +1 %)
+    const sink = new Anim(0, () => invalidate(render));
     const ox = new Anim(0, () => invalidate(render)), oy = new Anim(0, () => invalidate(render));
     const vx = new VelocityTracker(), vy = new VelocityTracker();
     let start = null, x0 = 0, y0 = 0, base = null, suppress = false;
@@ -327,7 +332,7 @@
     const elong = (v, size) => { const cap = 0.22 * size; return cap * (1 - Math.exp((-0.6 * Math.abs(v)) / cap)); };
     function render() {
       const z = sizeOf(el), w = z.w, h = z.h, p = glow.p.value;
-      const scale = 1 + (4 / h) * p;
+      const scale = o.press === 'shrink' ? 1 - 0.08 * sink.value : 1 + (4 / h) * p;
       const px = o.reach * ox.value, py = o.reach * oy.value; // reach: share of the pull that reaches the button
       const ex = elong(px, w), ey = elong(py, h); // elongation along the pull, px
       const sx = scale * (1 + ex / w) * (1 - (0.3 * ey) / h), sy = scale * (1 + ey / h) * (1 - (0.3 * ex) / w);
@@ -351,6 +356,7 @@
       off = gesture(el, {
         down: (e, [x, y]) => {
           glow.down(x, y); suppress = false;
+          if (o.press === 'shrink') sink.animateTo(1, SINK.down);
           if (!o.stretch) return;
           // button position without its own transform (it may still be bouncing)
           const r = el.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
@@ -374,6 +380,7 @@
             if (out > 12) suppress = true;
           }
           glow.up(); if (o.stretch) release();
+          if (o.press === 'shrink') sink.animateTo(0, SINK.up);
           start = null;
         },
       });
@@ -798,6 +805,19 @@
     holdMs: 150, holdMsScroll: 300, slop: 13, handoff: 10, margin: 12, stretch: 20, recede: 0.971, dim: 0.5, inset: 10,
     open: byResponse(0.8, 0.32), close: byResponse(0.85, 0.35), sub: byResponse(0.85, 0.4), back: byResponse(1, 0.4),
     track: byResponse(0.86, 0.15, 0.1), fade: spring(1, 1500, 0.01),
+    // motion 'grow', measured frame by frame on a native Android pull-down menu (60 fps capture, 6 opens and 6 closes,
+    // each fit within 0.1 % of scale and 2 px of position): the whole panel, text and corners with it, scales up from a
+    // point at the button's bottom edge under its outer side. Scale 0.8 / 0.405 s from 0 (+1.6 % at about 340 ms); the
+    // centre travels on its own springs, vertically faster (0.94 / 0.22 s) than sideways (0.82 / 0.34 s), so the menu
+    // drops under the button first and spreads out after. The panel fades in critically damped over 0.27 s, its text
+    // 30 ms later; the blur is there from the start, only the opacity changes. Closing is three times faster: scale
+    // 1 / 0.22 s toward 0, the centre to the button's centre (sideways 0.19 s, up 0.39 s), the panel's opacity follows
+    // the scale, the text goes by 0.3 of it, and the menu is gone at 0.15, about 120 ms after the tap.
+    grow: {
+      scale: byResponse(0.8, 0.405), x: byResponse(0.82, 0.34, 0.05), y: byResponse(0.94, 0.22, 0.05),
+      fade: 0.27, fadeDelay: 12, text: 0.28, textDelay: 38,
+      close: byResponse(1, 0.22), closeX: byResponse(1, 0.19, 0.05), closeY: byResponse(1, 0.39, 0.05), gone: 0.15, gap: 6,
+    },
   };
   const MENU_ICONS = {
     check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -879,9 +899,10 @@
 
   function menu(trigger, opts) {
     const fine = !!(root.matchMedia && root.matchMedia('(pointer: fine)').matches);
-    const o = Object.assign({ items: [], layout: 'large', onSelect: null, onOpen: null, onClose: null, onHighlight: null, minWidth: 250, maxWidth: 320, radius: fine ? 22 : 32, glass: null }, opts);
+    const o = Object.assign({ items: [], layout: 'large', onSelect: null, onOpen: null, onClose: null, onHighlight: null, minWidth: 250, maxWidth: 320, radius: fine ? 22 : 32, glass: null, motion: 'morph', gap: MENU.grow.gap }, opts);
     const id = 'lgu-menu-' + ++menuUid;
-    if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { stretch: false });
+    const G = MENU.grow;
+    if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { stretch: false, press: o.motion === 'grow' ? 'shrink' : 'grow' });
     trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
     trigger.style.touchAction = 'none'; // a held finger slides from the button into the menu: the browser must not take it for a scroll
     trigger.style.webkitTouchCallout = 'none';
@@ -891,6 +912,17 @@
     let state = 'closed', ui = null, press = null, lit = null, kbd = false, openedAt = 0;
     const inv = () => invalidate(render);
     const sA = new Anim(0, inv), stx = new Anim(0, inv), sty = new Anim(0, inv), glowA = new Anim(0, inv);
+    // motion 'grow': the panel's centre (px); the opacities of its glass and its text are read off the clock
+    const gx = new Anim(0, inv), gy = new Anim(0, inv);
+    // a critically damped spring from 0 to 1, response r seconds, t seconds after its start: exact at any frame time,
+    // so the 12 ms and 38 ms delays hold at 60 and 120 Hz alike
+    const critAt = (t, r) => { if (t <= 0) return 0; const w = (2 * Math.PI) / r; return 1 - Math.exp(-w * t) * (1 + w * t); };
+    const fades = (u) => {
+      if (u.fz) return u.fz;
+      const age = (performance.now() - openedAt) / 1000;
+      if (reduceMotion()) return { g: 1, t: 1 };
+      return { g: critAt(age - G.fadeDelay / 1000, G.fade), t: critAt(age - G.textDelay / 1000, G.text) };
+    };
     const hlA = { x: new Anim(0, inv), y: new Anim(0, inv), w: new Anim(0, inv), h: new Anim(0, inv), op: new Anim(0, inv) };
 
     const vw = () => document.documentElement.clientWidth || root.innerWidth, vh = () => root.innerHeight;
@@ -934,12 +966,31 @@
       const maxH = vh() - 2 * m;
       const H = Math.min(panel.offsetHeight, maxH);
       body.style.maxHeight = maxH + 'px';
-      // place: the menu covers its button and opens toward the room (iOS 26)
-      let L = T.left + W <= vw() - m ? T.left : T.right - W >= m ? T.right - W : clamp(T.left, m, vw() - m - W);
-      let Tp = T.top + H <= vh() - m ? T.top : T.bottom - H >= m ? T.bottom - H : clamp(T.top, m, vh() - m - H);
+      const grow = o.motion === 'grow';
+      let L, Tp, below = true, outer = 'left';
+      if (grow) {
+        // 'grow': under the button with a small gap (above it when there is no room), its outer edge in line with
+        // the button's outer edge: a button on the right half aligns right edges, on the left half left edges
+        const gap = o.gap;
+        below = T.bottom + gap + H <= vh() - m || (T.top - gap - H < m && vh() - T.bottom >= T.top);
+        Tp = clamp(below ? T.bottom + gap : T.top - gap - H, m, Math.max(m, vh() - m - H));
+        outer = T.left + T.width / 2 > vw() / 2 ? 'right' : 'left';
+        L = clamp(outer === 'right' ? T.right - W : T.left, m, Math.max(m, vw() - m - W));
+      } else {
+        // place: the menu covers its button and opens toward the room (iOS 26)
+        L = T.left + W <= vw() - m ? T.left : T.right - W >= m ? T.right - W : clamp(T.left, m, vw() - m - W);
+        Tp = T.top + H <= vh() - m ? T.top : T.bottom - H >= m ? T.bottom - H : clamp(T.top, m, vh() - m - H);
+      }
       L = Math.max(4, L); Tp = Math.max(4, Tp);
       const R = Math.min(o.radius, W / 2, H / 2);
       Object.assign(panel.style, { left: L + 'px', top: Tp + 'px', height: H + 'px', borderRadius: R + 'px' });
+      let rim = null;
+      if (grow) {
+        // the edge of the growing panel: the glass is clipped while it grows and draws its own edge only at rest
+        rim = document.createElement('div'); rim.className = 'lgu-menu-rim';
+        Object.assign(rim.style, { width: W + 'px', height: H + 'px', borderRadius: R + 'px' });
+        panel.appendChild(rim);
+      }
       const tr = triggerRadius(T);
       const refract = refracts();
       let grp = null;
@@ -952,9 +1003,11 @@
       } else panel.classList.add('lgu-menu--frost');
       const ax = T.left + T.width / 2 - L, ay = T.top + T.height / 2 - Tp; // anchor: the button's centre in panel space
       ui = {
-        layer, catcher, panel, glow: sf.glow, body, grp, refract, dk, R, W, H, L, T: Tp, maxH, g,
+        layer, catcher, panel, glow: sf.glow, body, grp, refract, dk, R, W, H, L, T: Tp, maxH, g, grow, rim,
+        // 'grow': where the panel starts (the button's bottom edge under its outer side) and the button's centre
+        g0: { x: outer === 'right' ? T.right : T.left, y: below ? T.bottom : T.top }, tc: { x: T.left + T.width / 2, y: T.top + T.height / 2 },
         tr: { l: T.left, t: T.top, w: T.width, h: T.height, r: tr === 'capsule' ? Math.min(T.width, T.height) / 2 : Math.min(tr, T.width / 2, T.height / 2) },
-        lq: grp ? grp.layer.getBoundingClientRect() : null, ax, ay, down: ay <= H / 2,
+        lq: grp ? grp.layer.getBoundingClientRect() : null, ax, ay, down: grow ? below : ay <= H / 2,
         veil: target.veil, blur: target.blur, refr: target.refr, cards: [],
         levels: [{ host: body, surface: panel, glow: sf.glow, rows: lvl.rows, hl: lvl.hl, R }],
       };
@@ -973,6 +1026,12 @@
       const c0 = u.cards[0], r0 = c0 ? clamp(c0.p.value, 0, 1.2) : 0, k = lerp(1, MENU.recede, r0);
       const e = clamp(s, 0, 1);
       const PL = u.L + (W * (1 - k)) / 2, PT = u.T + (u.down ? 0 : H * (1 - k)), PW = W * k, PH = H * k;
+      if (u.grow) renderGrow(u, s, k, PL, PT, PW, PH, r0, c0);
+      else renderMorph(u, s, e, k, PL, PT, PW, PH, r0, c0);
+      renderCards(u);
+    }
+    function renderMorph(u, s, e, k, PL, PT, PW, PH, r0, c0) {
+      const W = u.W, H = u.H;
       const rl = lerp(u.tr.l, PL, e), rt = lerp(u.tr.t, PT, e), rw = lerp(u.tr.w, PW, e), rh = lerp(u.tr.h, PH, e);
       const rh2 = rh;
       const rr = Math.min(lerp(Math.min(rw, rh) / 2, u.R * k, smoothstep(0.45, 1, e)), rh2 / 2);
@@ -992,6 +1051,55 @@
         ly.style.clipPath = full ? '' : `inset(${(rt - q.top).toFixed(2)}px ${(q.right - rl - rw).toFixed(2)}px ${(q.bottom - rt - rh2).toFixed(2)}px ${(rl - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
         ly.style.opacity = smoothstep(0, 0.12, s).toFixed(3);
       } else if (!u.grp) u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
+    }
+    // motion 'grow' (see MENU.grow): the rect is the rest rect scaled by s about the animated centre. The glass stays
+    // drawn once at full size; while the rect lies inside it the glass is only clipped (a phone WebView redraws a clip
+    // every frame). Past it (the 1.6 % overshoot, a few px of the centre's own spring) the glass layer is moved and
+    // scaled by those few px instead: a stale picture of frosted glass shifted by 4 px still looks the same.
+    function renderGrow(u, s, k, PL, PT, PW, PH, r0, c0) {
+      const W = u.W, H = u.H, S = Math.max(0, s);
+      const cx = gx.value + (PL + PW / 2 - (u.L + W / 2)), cy = gy.value + (PT + PH / 2 - (u.T + H / 2));
+      const rw = PW * S, rh = PH * S, rl = cx - rw / 2, rt = cy - rh / 2;
+      const rr = Math.min(u.R * k * S, rw / 2, rh / 2);
+      const closing = state === 'closing';
+      const f = fades(u);
+      const glassOp = closing ? Math.min(f.g, clamp(S, 0, 1)) : f.g;
+      const textOp = closing ? Math.min(f.t, clamp((S - 0.3) / 0.7, 0, 1)) : f.t;
+      // only the overshoot moves the glass; any other step outside the box (the first frames start at the button's
+      // edge, a gap above the box) is clipped to the box
+      const eps = 0.01, inside = rw <= PW + eps && rh <= PH + eps;
+      const atRest = Math.abs(rl - u.L) < eps && Math.abs(rt - u.T) < eps && Math.abs(rw - W) < eps && Math.abs(rh - H) < eps;
+      // the panel (text, glow, highlight): clipped to the rect within its box
+      const il = Math.max(0, rl - u.L), it = Math.max(0, rt - u.T), ir = Math.max(0, u.L + W - rl - rw), ib = Math.max(0, u.T + H - rt - rh);
+      const unclipped = il < eps && it < eps && ir < eps && ib < eps;
+      u.panel.style.clipPath = unclipped ? '' : `inset(${it.toFixed(2)}px ${ir.toFixed(2)}px ${ib.toFixed(2)}px ${il.toFixed(2)}px round ${rr.toFixed(2)}px)`;
+      u.panel.style.boxShadow = unclipped ? '0 8px 36px rgb(0 0 0 / .1)' : '';
+      // the content scales with the panel, crisp (no blur): the text, the corners and the edge are one picture
+      const tf = atRest ? '' : `translate(${(rl - u.L).toFixed(2)}px, ${(rt - u.T).toFixed(2)}px) scale(${Math.max(0.001, rw / W).toFixed(4)})`;
+      u.body.style.transform = tf;
+      u.body.style.filter = '';
+      u.body.style.opacity = (textOp * lerp(1, MENU.dim, clamp(r0, 0, 1))).toFixed(3);
+      if (u.rim) {
+        u.rim.style.transform = tf;
+        u.rim.style.opacity = (glassOp * (1 - smoothstep(0.96, 1, S))).toFixed(3);
+      }
+      if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
+      if (u.grp && u.grp.layer && u.lq) {
+        const q = u.lq, ly = u.grp.layer;
+        if (inside) {
+          ly.style.transform = '';
+          ly.style.clipPath = atRest ? '' : `inset(${(u.T + it - q.top).toFixed(2)}px ${(q.right - u.L - W + ir).toFixed(2)}px ${(q.bottom - u.T - H + ib).toFixed(2)}px ${(u.L + il - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
+        } else {
+          const sg = Math.max(1, rw / W, rh / H), ox = u.L + W / 2 - q.left, oy = u.T + H / 2 - q.top;
+          const lw = rw / sg, lh = rh / sg;
+          ly.style.transformOrigin = `${ox.toFixed(2)}px ${oy.toFixed(2)}px`;
+          ly.style.transform = `translate(${(cx - (u.L + W / 2)).toFixed(2)}px, ${(cy - (u.T + H / 2)).toFixed(2)}px) scale(${sg.toFixed(4)})`;
+          ly.style.clipPath = lw > W - eps && lh > H - eps ? '' : `inset(${(oy - lh / 2).toFixed(2)}px ${(q.width - ox - lw / 2).toFixed(2)}px ${(q.height - oy - lh / 2).toFixed(2)}px ${(ox - lw / 2).toFixed(2)}px round ${(rr / sg).toFixed(2)}px)`;
+        }
+        ly.style.opacity = glassOp.toFixed(3);
+      } else if (!u.grp) u.panel.style.opacity = glassOp.toFixed(3);
+    }
+    function renderCards(u) {
       // sub-menu cards, each its own glass in front of the level below
       u.cards.forEach((cd, i) => {
         const p = cd.p.value, pc2 = clamp(p, 0, 1.2), next = u.cards[i + 1], rn = next ? clamp(next.p.value, 0, 1.2) : 0; // a card under a deeper card only dims
@@ -1032,14 +1140,21 @@
       for (const a of Object.values(hlA)) a.snapTo(0);
       stx.snapTo(0); sty.snapTo(0); glowA.snapTo(0);
       sA.snapTo(0);
+      const cx = u.L + u.W / 2, cy = u.T + u.H / 2;
+      if (u.grow) { gx.snapTo(u.g0.x); gy.snapTo(u.g0.y); }
       if (reduceMotion()) {
         sA.snapTo(1);
+        if (u.grow) { gx.snapTo(cx); gy.snapTo(cy); }
         for (const el of [u.panel, u.grp && u.grp.layer].filter(Boolean)) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      } else if (u.grow) {
+        sA.animateTo(1, G.scale).then(() => { if (ui === u && state === 'open' && u.grp) u.grp.refresh(); });
+        gx.animateTo(cx, G.x); gy.animateTo(cy, G.y);
       } else sA.animateTo(1, MENU.open).then(() => { if (ui === u && state === 'open' && u.grp) u.grp.refresh(); });
       render();
       if (u.grp) nextFrame().then(nextFrame).then(() => { if (ui === u && u.grp) u.grp.refresh(); });
-      // the button's own glass gives way once the group's pictures are decoded: no frame without glass
-      if (u.grp) u.grp.ready().then(nextFrame).then(() => { if (ui === u && state === 'open') setTriggerGlass(false); });
+      // the button's own glass gives way once the group's pictures are decoded: no frame without glass.
+      // 'grow' leaves the button in place: the menu grows beside it
+      if (u.grow) {} else if (u.grp) u.grp.ready().then(nextFrame).then(() => { if (ui === u && state === 'open') setTriggerGlass(false); });
       else setTriggerGlass(false);
       root.addEventListener('keydown', onDocKey, true);
       root.addEventListener('resize', onWinChange); root.addEventListener('scroll', onScroll, true);
@@ -1069,6 +1184,13 @@
       if (reduceMotion()) {
         const els = [u.layer];
         Promise.all(els.map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: 'ease-in', fill: 'forwards' }).finished)).then(finish, finish);
+        return;
+      }
+      if (u.grow) {
+        // three times faster than the entrance, toward the button's centre; gone at 0.15 of the size
+        u.fz = fades(u); // the fades stop where they are; the opacities follow the scale down from there
+        sA.animateTo(0, G.close); gx.animateTo(u.tc.x, G.closeX); gy.animateTo(u.tc.y, G.closeY);
+        until(() => sA.value < G.gone || ui !== u).then(finish);
         return;
       }
       sA.animateTo(0, MENU.close);
