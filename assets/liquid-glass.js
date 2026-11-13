@@ -920,6 +920,9 @@
       has: (el) => members.some((m) => m.el === el),
       get members() { return members.map((m) => m.el); },
       update, rebuild: build,
+      // re-attach the filter: the compositor drops and rebuilds the backdrop effect (a mobile WebView can keep
+      // drawing an old frame of a live group after its pictures moved); cheap once, not for every frame
+      refresh() { if (!box) return; layer.style.backdropFilter = layer.style.webkitBackdropFilter = 'none'; void layer.offsetWidth; layer.style.backdropFilter = layer.style.webkitBackdropFilter = `url(#${id})`; update(); },
       set(p) { Object.assign(o, p); for (const mb of members) mb.sUrl = null; build(); },
       // cheap per-frame changes of the material, no rebuild: veil density, backdrop blur, refraction depth
       tune(p) {

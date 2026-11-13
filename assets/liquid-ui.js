@@ -963,7 +963,9 @@
       // the menu recedes and dims while a sub-menu card lies over it
       const c0 = u.cards[0], r0 = c0 ? clamp(c0.p.value, 0, 1.2) : 0, k = lerp(1, MENU.recede, r0);
       // growth about the anchor, the recede about the anchored edge, then the stretch toward a finger held outside
-      let l = u.ax * (1 - s) + (W * s * (1 - k)) / 2, t = u.ay * (1 - s) + (u.down ? 0 : H * s * (1 - k)), w = W * s * k, h = H * s * k;
+      // never a zero-size shape in the glass: a picture of size 0 can leave the whole effect blank in a mobile WebView
+      const sv = Math.max(s, 0.04);
+      let l = u.ax * (1 - sv) + (W * sv * (1 - k)) / 2, t = u.ay * (1 - sv) + (u.down ? 0 : H * sv * (1 - k)), w = W * sv * k, h = H * sv * k;
       const fx = stx.value, fy = sty.value;
       const dl = fx > 0 ? 0.25 * fx : fx, dr = fx > 0 ? fx : 0.25 * fx, dt = fy > 0 ? 0.25 * fy : fy, db = fy > 0 ? fy : 0.25 * fy;
       l += dl; w += dr - dl; t += dt; h += db - dt;
@@ -976,11 +978,11 @@
       if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
       // the drop: concentric with the panel, from the button's size to its resting size inside the panel
       // it melts into the panel over the last part of the growth, so a menu at rest is the panel alone
-      const pc = Math.max(0, s), dd = lerp(u.d0, u.D, Math.min(pc, 1)) * (1 - smoothstep(0.8, 1, pc));
+      const pc = Math.max(0, s), dd = Math.max(lerp(u.d0, u.D, Math.min(pc, 1)) * (1 - smoothstep(0.8, 1, pc)), 2);
       const cx = u.L + u.ax + pc * (W / 2 - u.ax), cy = u.T + u.ay + pc * (H / 2 - u.ay);
       u.drop.style.transform = `translate(${(cx - (u.L + W / 2)).toFixed(2)}px, ${(cy - (u.T + H / 2)).toFixed(2)}px) scale(${(dd / u.D).toFixed(4)})`;
       // the capsule in the button's place gives way to the drop
-      u.proxy.style.transform = `scale(${lerp(1, 0, smoothstep(0.1, 0.6, s)).toFixed(4)})`;
+      u.proxy.style.transform = `scale(${lerp(1, 0.04, smoothstep(0.1, 0.6, s)).toFixed(4)})`;
       if (u.grp) {
         u.grp.tune({ veilOpacity: u.veil * smoothstep(0.15, 0.75, s), blur: lerp(1, u.blur, smoothstep(0, 0.7, s)), refraction: lerp(18, u.refr, smoothstep(0, 1, s)) });
         u.grp.update();
@@ -1001,9 +1003,9 @@
         const ce = glass;
         cd.el.style.boxShadow = `0 ${(18 * ce).toFixed(1)}px ${(48 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.2 * ce).toFixed(3)}), 0 ${(2 * ce).toFixed(1)}px ${(8 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.06 * ce).toFixed(3)})`;
         if (cd.grp) {
-          cd.grp.tune({ veilOpacity: cd.veil, blur: u.blur, refraction: lerp(18, u.refr, glass) });
+          cd.grp.tune({ veilOpacity: cd.veil * glass, blur: lerp(1, u.blur, glass), refraction: lerp(18, u.refr, glass) });
           cd.grp.update();
-          if (cd.grp.layer) cd.grp.layer.style.opacity = glass.toFixed(3);
+          if (cd.grp.layer) cd.grp.layer.style.opacity = smoothstep(0, 0.15, cd.popping ? glass : p).toFixed(3);
         } else cd.el.style.opacity = glass.toFixed(3);
       });
       // highlight pill and finger glow on the level in front
@@ -1028,8 +1030,9 @@
       if (reduceMotion()) {
         sA.snapTo(1);
         for (const el of [u.panel, u.grp && u.grp.layer].filter(Boolean)) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
-      } else sA.animateTo(1, MENU.open);
+      } else sA.animateTo(1, MENU.open).then(() => { if (ui === u && state === 'open' && u.grp) u.grp.refresh(); });
       render();
+      if (u.grp) nextFrame().then(nextFrame).then(() => { if (ui === u && u.grp) u.grp.refresh(); });
       // the button's own glass gives way once the group's pictures are decoded: no frame without glass
       if (u.grp) u.grp.ready().then(nextFrame).then(() => { if (ui === u && state === 'open') setTriggerGlass(false); });
       else setTriggerGlass(false);
@@ -1151,8 +1154,7 @@
         const g = Object.assign({}, u.g, { observe: false, fadeIn: false });
         cd.grp = LG.group(wrap, g);
         cd.grp.add(el, { radius: R, live: true });
-        cd.grp.tune({ veilOpacity: cd.veil, blur: u.blur, refraction: 18 });
-        if (cd.grp.layer) cd.grp.layer.style.opacity = '0';
+        cd.grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
       } else el.classList.add('lgu-menu--frost');
       cd.p = new Anim(0, inv);
       u.cards.push(cd);
@@ -1161,8 +1163,10 @@
       parent.host.style.pointerEvents = 'none';
       u.levels.push(lv);
       glowA.animateTo(0, MENU.fade); stx.animateTo(0, BOUNCE); sty.animateTo(0, BOUNCE);
-      if (reduceMotion()) cd.p.snapTo(1); else cd.p.animateTo(1, MENU.sub);
+      const settle = () => { if (ui === u && !cd.popping) { if (cd.grp) cd.grp.refresh(); if (u.grp) u.grp.refresh(); } };
+      if (reduceMotion()) cd.p.snapTo(1); else cd.p.animateTo(1, MENU.sub).then(settle);
       render();
+      if (cd.grp) nextFrame().then(nextFrame).then(() => { if (ui === u && cd.grp && !cd.popping) cd.grp.refresh(); });
       el.focus({ preventScroll: true });
       if (kbd) setTimeout(() => focusRow(1), 0);
     }
@@ -1178,6 +1182,7 @@
         cd.wrap.remove(); u.cards = u.cards.filter((x) => x !== cd);
         for (const row of cd.covered) row.style.opacity = '';
         inv();
+        if (ui === u && u.grp && state === 'open') nextFrame().then(() => { if (ui === u && u.grp) u.grp.refresh(); });
       };
       if (reduceMotion()) { cd.p.snapTo(0); done(); }
       else { cd.p.animateTo(0, MENU.back); until(() => cd.p.value < 0.01 || ui !== u).then(done); }
