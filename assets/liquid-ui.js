@@ -805,6 +805,9 @@
     holdMs: 150, holdMsScroll: 300, slop: 13, handoff: 10, margin: 12, stretch: 20, recede: 0.971, dim: 0.5, inset: 10,
     open: byResponse(0.8, 0.32), close: byResponse(0.85, 0.35), sub: byResponse(0.85, 0.4), back: byResponse(1, 0.4),
     track: byResponse(0.86, 0.15, 0.1), fade: spring(1, 1500, 0.01),
+    // a sub-menu card on its way back: its text fades over the first 0.55 of the back spring (about 100 ms) and its
+    // glass over 0.7 (about 140 ms) while the clip shrinks it toward its row; quicker fades read as a blink
+    popText: 0.55, popGlass: 0.7,
     // motion 'grow', measured frame by frame on a native Android pull-down menu (60 fps capture, 6 opens and 6 closes,
     // each fit within 0.1 % of scale and 2 px of position): the whole panel, text and corners with it, scales up from a
     // point at the button's bottom edge under its outer side. Scale 0.8 / 0.405 s from 0 (+1.6 % at about 340 ms); the
@@ -1106,7 +1109,7 @@
     // rows of the level below that a card covers: they leave fast as the card arrives and come back as exactly the
     // inverse of the card's text when it leaves (a cross-fade). Waiting for the card's spring to settle left the
     // place empty, bare tinted glass, for about 150 ms after the card had faded
-    const coverOp = (cd) => { const p = clamp(cd.p.value, 0, 1.2); return cd.popping ? smoothstep(0, 0.3, 1 - p) : 1 - smoothstep(0, 0.3, p); };
+    const coverOp = (cd) => { const p = clamp(cd.p.value, 0, 1.2); return cd.popping ? smoothstep(0, MENU.popText, 1 - p) : 1 - smoothstep(0, 0.3, p); };
     function renderCards(u) {
       // sub-menu cards, each its own glass in front of the level below
       u.cards.forEach((cd, i) => {
@@ -1118,8 +1121,8 @@
         const it = Math.max(0, top - cd.T), ib = Math.max(0, cd.T + cd.H - (top + hh)), open = it < 0.5 && ib < 0.5;
         cd.el.style.clipPath = open ? '' : `inset(${it.toFixed(2)}px 0px ${ib.toFixed(2)}px 0px round ${cd.R}px)`;
         // the rows arrive with the material and lead it: no frame shows an empty frosted card
-        const glass = cd.popping ? 1 - smoothstep(0, 0.32, 1 - p) : smoothstep(0, 0.2, p);
-        const text = cd.popping ? 1 - smoothstep(0, 0.3, 1 - p) : smoothstep(0, 0.3, p);
+        const glass = cd.popping ? 1 - smoothstep(0, MENU.popGlass, 1 - p) : smoothstep(0, 0.2, p);
+        const text = cd.popping ? 1 - smoothstep(0, MENU.popText, 1 - p) : smoothstep(0, 0.3, p);
         cd.body.style.opacity = (text * lerp(1, MENU.dim, clamp(rn, 0, 1))).toFixed(3);
         if (next) for (const row of next.covered) row.style.opacity = coverOp(next).toFixed(3);
         // no shadow under a sub-menu card: nothing shows one in iOS (the card is just denser glass over the menu)
