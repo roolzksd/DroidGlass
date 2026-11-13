@@ -989,23 +989,24 @@
       } else u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
       // sub-menu cards, each its own glass in front of the level below
       u.cards.forEach((cd, i) => {
-        const p = cd.p.value, pc2 = clamp(p, 0, 1.2), next = u.cards[i + 1], rn = next ? clamp(next.p.value, 0, 1.2) : 0, kk = lerp(1, MENU.recede, rn);
-        // the card flies from its row to its place; its width stays, its height grows down (rows are revealed, never squashed)
+        const p = cd.p.value, pc2 = clamp(p, 0, 1.2), next = u.cards[i + 1], rn = next ? clamp(next.p.value, 0, 1.2) : 0; // a card under a deeper card only dims
+        // The card's glass is drawn once at its full size and never moves: the card is revealed by a clip that grows
+        // from its row down to its place. A phone WebView redraws a clip every frame, while moved glass pictures
+        // can lag behind there (the card then looked clear at first). Its rows are revealed, never squashed.
         const top = lerp(cd.srcT, cd.T, pc2), hh = Math.max(1, lerp(cd.srcH, cd.H, pc2));
-        const sy = hh / cd.H;
-        cd.el.style.transform = `translate(${((cd.W * (1 - kk)) / 2).toFixed(2)}px, ${(top - cd.T).toFixed(2)}px) scale(${kk.toFixed(4)}, ${(sy * kk).toFixed(4)})`;
-        cd.body.style.transform = `scale(1, ${(1 / sy).toFixed(4)})`;
+        const it = Math.max(0, top - cd.T), ib = Math.max(0, cd.T + cd.H - (top + hh)), open = it < 0.5 && ib < 0.5;
+        cd.el.style.clipPath = open ? '' : `inset(${it.toFixed(2)}px 0px ${ib.toFixed(2)}px 0px round ${cd.R}px)`;
         // the rows arrive with the material and lead it: no frame shows an empty frosted card
-        const glass = cd.popping ? 1 - smoothstep(0, 0.32, 1 - p) : smoothstep(0, 0.45, p);
+        const glass = cd.popping ? 1 - smoothstep(0, 0.32, 1 - p) : smoothstep(0, 0.2, p);
         const text = cd.popping ? 1 - smoothstep(0, 0.3, 1 - p) : smoothstep(0, 0.3, p);
         cd.body.style.opacity = (text * lerp(1, MENU.dim, clamp(rn, 0, 1))).toFixed(3);
         if (next) for (const row of next.covered) row.style.opacity = (1 - smoothstep(0, 0.3, rn)).toFixed(3);
         const ce = glass;
-        cd.el.style.boxShadow = `0 ${(18 * ce).toFixed(1)}px ${(48 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.2 * ce).toFixed(3)}), 0 ${(2 * ce).toFixed(1)}px ${(8 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.06 * ce).toFixed(3)})`;
-        if (cd.grp) {
-          cd.grp.tune({ veilOpacity: cd.veil * glass, blur: lerp(1, u.blur, glass), refraction: lerp(18, u.refr, glass) });
-          cd.grp.update();
-          if (cd.grp.layer) cd.grp.layer.style.opacity = smoothstep(0, 0.15, cd.popping ? glass : p).toFixed(3);
+        cd.el.style.boxShadow = open ? `0 ${(18 * ce).toFixed(1)}px ${(48 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.2 * ce).toFixed(3)}), 0 ${(2 * ce).toFixed(1)}px ${(8 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.06 * ce).toFixed(3)})` : '';
+        if (cd.grp && cd.grp.layer) {
+          const ly = cd.grp.layer, q = cd.lq;
+          ly.style.clipPath = open ? '' : `inset(${(cd.T - q.top + it).toFixed(2)}px ${(q.right - cd.L - cd.W).toFixed(2)}px ${(q.bottom - cd.T - cd.H + ib).toFixed(2)}px ${(cd.L - q.left).toFixed(2)}px round ${cd.R}px)`;
+          ly.style.opacity = glass.toFixed(3);
         } else cd.el.style.opacity = glass.toFixed(3);
       });
       // highlight pill and finger glow on the level in front
@@ -1154,7 +1155,10 @@
         const g = Object.assign({}, u.g, { observe: false, fadeIn: false });
         cd.grp = LG.group(wrap, g);
         cd.grp.add(el, { radius: R, live: true });
-        cd.grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
+        // full material from the start; the clip and the opacity do the entrance (see render)
+        cd.grp.tune({ veilOpacity: cd.veil, blur: u.blur, refraction: u.refr });
+        cd.lq = cd.grp.layer ? cd.grp.layer.getBoundingClientRect() : null;
+        if (cd.grp.layer) cd.grp.layer.style.opacity = '0';
       } else el.classList.add('lgu-menu--frost');
       cd.p = new Anim(0, inv);
       u.cards.push(cd);
