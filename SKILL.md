@@ -54,7 +54,7 @@ From the Human Interface Guidelines, WWDC25 "Meet Liquid Glass" and popular comm
 | Dialog, radius 48 | brightness 0.2 (light), saturation 1.5, blur 16 (dark 8), lens(24, 48, depth) | Plain | dims the backdrop #29293A 23% (dark #121212 56%) |
 | Control centre tile | vibrancy, lens(24, 48, depth) | Default, angle from device tilt, falloff 2 | enter: 48 dp offset and alpha |
 | Magnifier 128×96 | lens(8, 24, depth, dispersion), backdrop zoomed 1.5x | inner shadow 16 | drag |
-| Menu (web, `LiquidUI.menu`)* | merge group: blur 10, refraction 34, rim 16, saturation 1.7, page-coloured veil 74% (dark 64%), radius 32 | glare 0.6, specular line 0.7, rim shading; shadow 0 16 44 at 16% | pops open out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide, the highlight pill slides between rows |
+| Menu (web, `LiquidUI.menu`)* | merge group: blur 10, refraction 34, rim 16, saturation 1.7, page-coloured veil 74% (dark 64%), radius 32 | glare 0.6, specular line 0.7, rim shading; a faint shadow 0 8 36 at 10% (none under a sub-menu card) | pops open out of its button on spring 0.8 / 0.32 s, closes on 0.85 / 0.35 s; hold 150 ms and slide, the highlight pill slides between rows |
 
 \* Not from Kyant: the springs and gesture thresholds are measured from UIKit on iOS 26.2 (astryx), the material is matched to iOS screenshots by eye.
 

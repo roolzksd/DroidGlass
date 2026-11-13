@@ -969,7 +969,8 @@
       // content: scaled into the rect from its top-left, fading in from a light blur (s may overshoot a little)
       const sc = Math.max(0.01, (rw / W) * (s > 1 ? s : 1));
       u.body.style.transform = full && s < 1.0005 ? '' : `translate(${(rl - u.L).toFixed(2)}px, ${(rt - u.T).toFixed(2)}px) scale(${sc.toFixed(4)})`;
-      u.panel.style.boxShadow = full ? '0 16px 44px rgb(0 0 0 / .16), 0 2px 8px rgb(0 0 0 / .05)' : '';
+      // a faint, wide shadow, as around an iOS 26 menu (about 4 % darker at the edge, gone at about 32 px)
+      u.panel.style.boxShadow = full ? '0 8px 36px rgb(0 0 0 / .1)' : '';
       const op = smoothstep(0.35, 0.85, s);
       u.body.style.opacity = (op * lerp(1, MENU.dim, clamp(r0, 0, 1))).toFixed(3);
       u.body.style.filter = op < 0.999 ? `blur(${((1 - op) * 4).toFixed(2)}px)` : '';
@@ -993,8 +994,7 @@
         const text = cd.popping ? 1 - smoothstep(0, 0.3, 1 - p) : smoothstep(0, 0.3, p);
         cd.body.style.opacity = (text * lerp(1, MENU.dim, clamp(rn, 0, 1))).toFixed(3);
         if (next) for (const row of next.covered) row.style.opacity = (1 - smoothstep(0, 0.3, rn)).toFixed(3);
-        const ce = glass;
-        cd.el.style.boxShadow = open ? `0 ${(18 * ce).toFixed(1)}px ${(48 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.2 * ce).toFixed(3)}), 0 ${(2 * ce).toFixed(1)}px ${(8 * ce).toFixed(1)}px rgb(0 0 0 / ${(0.06 * ce).toFixed(3)})` : '';
+        // no shadow under a sub-menu card: nothing shows one in iOS (the card is just denser glass over the menu)
         if (cd.grp && cd.grp.layer) {
           const ly = cd.grp.layer, q = cd.lq;
           ly.style.clipPath = open ? '' : `inset(${(cd.T - q.top + it).toFixed(2)}px ${(q.right - cd.L - cd.W).toFixed(2)}px ${(q.bottom - cd.T - cd.H + ib).toFixed(2)}px ${(cd.L - q.left).toFixed(2)}px round ${cd.R}px)`;
@@ -1144,7 +1144,7 @@
       // rows of the level below that end up under the card
       for (const row of parent.rows) { const q = row.el.getBoundingClientRect(), c = recededTop + ((q.top + q.height / 2) - ps.top) * MENU.recede; if (c > T && c < T + H) cd.covered.push(row.el); }
       if (u.refract) {
-        const g = Object.assign({}, u.g, { observe: false, fadeIn: false });
+        const g = Object.assign({}, u.g, { observe: false, fadeIn: false, shadow: 0 });
         cd.grp = LG.group(wrap, g);
         cd.grp.add(el, { radius: R, live: true });
         // full material from the start; the clip and the opacity do the entrance (see render). Denser than the menu:
