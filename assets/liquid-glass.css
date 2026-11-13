@@ -97,6 +97,9 @@
 .lgu-menu {
   position: absolute; overflow: hidden; pointer-events: auto; transform-origin: 0 0; outline: none;
   color: var(--lgu-menu-ink); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  /* the finger glow blends (plus-lighter) inside the panel only: without its own group the blend isolates the whole
+     menu layer, which becomes a backdrop root, and the glass under the panel samples black instead of the page */
+  isolation: isolate;
 }
 /* every part of the menu: a finger sliding over the rows is never taken for a scroll (the body is a scroll container,
    so the panel's own touch-action would not reach the rows) */

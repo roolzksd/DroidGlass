@@ -775,6 +775,9 @@
         }
       }
       l = Math.max(l, lim.left); t = Math.max(t, lim.top); r = Math.min(r, lim.right); b = Math.min(b, lim.bottom);
+      // whole pixels, inward: Chrome samples an empty (black) backdrop under a backdrop-filter layer whose SVG
+      // filter region is fractional
+      l = Math.ceil(l); t = Math.ceil(t); r = Math.floor(r); b = Math.floor(b);
       return { l, t, w: Math.max(1, r - l), h: Math.max(1, b - t) };
     }
 

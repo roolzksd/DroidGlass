@@ -962,13 +962,7 @@
       const e = clamp(s, 0, 1);
       const PL = u.L + (W * (1 - k)) / 2, PT = u.T + (u.down ? 0 : H * (1 - k)), PW = W * k, PH = H * k;
       const rl = lerp(u.tr.l, PL, e), rt = lerp(u.tr.t, PT, e), rw = lerp(u.tr.w, PW, e), rh = lerp(u.tr.h, PH, e);
-      let rh2 = rh;
-      // Under a card that reaches past the menu's bottom the menu's glass ends just below the card's top: its edge
-      // would otherwise show through the card's glass as a hard band (its rounded bottom stays just above the card)
-      if (c0) {
-        const pc = clamp(c0.p.value, 0, 1.2), ct = lerp(c0.srcT, c0.T, pc), cb = ct + Math.max(1, lerp(c0.srcH, c0.H, pc));
-        if (cb >= rt + rh - 1) rh2 = Math.max(Math.min(rh, ct + 1 - rt), 2 * u.R * k);
-      }
+      const rh2 = rh;
       const rr = Math.min(lerp(Math.min(rw, rh) / 2, u.R * k, smoothstep(0.45, 1, e)), rh2 / 2);
       const full = e > 0.999 && k > 0.9999 && rh2 === rh;
       u.panel.style.clipPath = full ? '' : `inset(${(rt - u.T).toFixed(2)}px ${(u.L + W - rl - rw).toFixed(2)}px ${(u.T + H - rt - rh2).toFixed(2)}px ${(rl - u.L).toFixed(2)}px round ${rr.toFixed(2)}px)`;
@@ -1146,15 +1140,16 @@
       body.style.maxHeight = H + 'px';
       const R = Math.min(o.radius, W / 2, H / 2);
       Object.assign(el.style, { left: restL + 'px', top: T + 'px', height: H + 'px', borderRadius: R + 'px' });
-      const cd = { wrap, el, body, glow: sf.glow, L: restL, T, W, H, R, srcT, srcH, grp: null, popping: false, covered: [], veil: Math.min(0.9, u.veil + 0.06) };
+      const cd = { wrap, el, body, glow: sf.glow, L: restL, T, W, H, R, srcT, srcH, grp: null, popping: false, covered: [], veil: Math.min(0.92, u.veil + 0.14), blur: u.blur * 2.4 };
       // rows of the level below that end up under the card
       for (const row of parent.rows) { const q = row.el.getBoundingClientRect(), c = recededTop + ((q.top + q.height / 2) - ps.top) * MENU.recede; if (c > T && c < T + H) cd.covered.push(row.el); }
       if (u.refract) {
         const g = Object.assign({}, u.g, { observe: false, fadeIn: false });
         cd.grp = LG.group(wrap, g);
         cd.grp.add(el, { radius: R, live: true });
-        // full material from the start; the clip and the opacity do the entrance (see render)
-        cd.grp.tune({ veilOpacity: cd.veil, blur: u.blur, refraction: u.refr });
+        // full material from the start; the clip and the opacity do the entrance (see render). Denser than the menu:
+        // the menu behind shows through it only as a soft tint, its edge melts instead of crossing the rows
+        cd.grp.tune({ veilOpacity: cd.veil, blur: cd.blur, refraction: u.refr });
         cd.lq = cd.grp.layer ? cd.grp.layer.getBoundingClientRect() : null;
         if (cd.grp.layer) cd.grp.layer.style.opacity = '0';
       } else el.classList.add('lgu-menu--frost');

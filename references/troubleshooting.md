@@ -42,3 +42,5 @@
 | The menu opens when the user only wanted to scroll | open on a hold of 150 ms (300 ms in a scrolling view) and cancel when the finger moves more than 13 px before that |
 | Typing in an open menu triggers page shortcuts | an old copy; the menu now stops its key events from reaching the page |
 | The menu jumps or picks the wrong row right after it opens | taps during the entrance must be ignored and a held finger must travel 10 px before it picks |
+| The menu's glass is a flat grey (light theme) or flat dark, nothing of the page shows through | an element with `mix-blend-mode` (the finger glow) inside a panel without its own stacking context isolates the whole overlay, which becomes a backdrop root, so the glass under it samples black; give the panel `isolation: isolate` |
+| The menu behind a sub-menu shows through the card as a band | the card's material must be denser than the menu's (more blur and veil) so the menu behind melts into a soft tint; do not cut the menu behind |
