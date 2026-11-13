@@ -910,12 +910,10 @@
       const dk = dark(), T = trigger.getBoundingClientRect();
       const layer = document.createElement('div'); layer.className = 'lgu-menu-layer' + (dk ? ' lgu-dark' : '');
       const catcher = document.createElement('div'); catcher.className = 'lgu-menu-catch';
-      const proxy = document.createElement('div'); proxy.className = 'lgu-menu-proxy';
-      const drop = document.createElement('div'); drop.className = 'lgu-menu-proxy';
       const sf = mkSurface(''), panel = sf.el, body = sf.body;
       panel.id = id;
       if (trigger.id) panel.setAttribute('aria-labelledby', trigger.id); else if (trigger.getAttribute('aria-label')) panel.setAttribute('aria-label', trigger.getAttribute('aria-label'));
-      layer.append(catcher, proxy, drop, panel); document.body.appendChild(layer);
+      layer.append(catcher, panel); document.body.appendChild(layer);
       const lvl = menuRows(body, typeof o.items === 'function' ? o.items() : o.items, o.layout, null); // a function: items with fresh state on every open
       // size: natural width within limits, height up to the screen; long menus scroll
       panel.style.width = 'max-content';
@@ -931,24 +929,20 @@
       const R = Math.min(o.radius, W / 2, H / 2);
       Object.assign(panel.style, { left: L + 'px', top: Tp + 'px', height: H + 'px', borderRadius: R + 'px' });
       const tr = triggerRadius(T);
-      Object.assign(proxy.style, { left: T.left + 'px', top: T.top + 'px', width: T.width + 'px', height: T.height + 'px', borderRadius: tr === 'capsule' ? '9999px' : tr + 'px' });
-      // the drop rests inside the panel, centred
-      const D = Math.max(8, Math.min(W, H) - 16);
-      Object.assign(drop.style, { left: L + W / 2 - D / 2 + 'px', top: Tp + H / 2 - D / 2 + 'px', width: D + 'px', height: D + 'px', borderRadius: '9999px' });
       const refract = refracts();
       let grp = null;
       const g = Object.assign(menuGlass(dk), o.glass || {}), target = { veil: g.veilOpacity, blur: g.blur, refr: g.refraction };
       if (refract) {
+        // the glass is drawn once at the menu's full size and never moves; the entrance is a clip (see render)
         grp = LG.group(layer, g);
-        grp.add(proxy, { radius: tr, live: true });
-        grp.add(drop, { radius: 'capsule', live: true });
-        grp.add(panel, { radius: R, live: true });
-        grp.tune({ veilOpacity: 0, blur: 1, refraction: 18 });
+        grp.add(panel, { radius: R });
+        grp.layer.style.opacity = '0';
       } else panel.classList.add('lgu-menu--frost');
       const ax = T.left + T.width / 2 - L, ay = T.top + T.height / 2 - Tp; // anchor: the button's centre in panel space
       ui = {
-        layer, catcher, proxy, drop, panel, glow: sf.glow, body, grp, refract, dk, R, W, H, L, T: Tp, maxH, g, D,
-        d0: Math.min(T.width, T.height), ax, ay, down: ay <= H / 2,
+        layer, catcher, panel, glow: sf.glow, body, grp, refract, dk, R, W, H, L, T: Tp, maxH, g,
+        tr: { l: T.left, t: T.top, w: T.width, h: T.height, r: tr === 'capsule' ? Math.min(T.width, T.height) / 2 : Math.min(tr, T.width / 2, T.height / 2) },
+        lq: grp ? grp.layer.getBoundingClientRect() : null, ax, ay, down: ay <= H / 2,
         veil: target.veil, blur: target.blur, refr: target.refr, cards: [],
         levels: [{ host: body, surface: panel, glow: sf.glow, rows: lvl.rows, hl: lvl.hl, R }],
       };
@@ -960,33 +954,30 @@
     function render() {
       if (!ui) return;
       const u = ui, s = sA.value, W = u.W, H = u.H;
-      // the menu recedes and dims while a sub-menu card lies over it
+      // The glass is drawn once at full size and never moves (a phone WebView may not redraw moved glass pictures
+      // every frame, so the menu looked clear while it grew). The entrance is a clip instead: a rounded rect that
+      // starts as the button (a capsule) and grows into the menu, staying round, a bubble, until late in the growth.
+      // The content scales into the same rect. A sub-menu card makes the menu recede and dim through the same clip.
       const c0 = u.cards[0], r0 = c0 ? clamp(c0.p.value, 0, 1.2) : 0, k = lerp(1, MENU.recede, r0);
-      // growth about the anchor, the recede about the anchored edge, then the stretch toward a finger held outside
-      // never a zero-size shape in the glass: a picture of size 0 can leave the whole effect blank in a mobile WebView
-      const sv = Math.max(s, 0.04);
-      let l = u.ax * (1 - sv) + (W * sv * (1 - k)) / 2, t = u.ay * (1 - sv) + (u.down ? 0 : H * sv * (1 - k)), w = W * sv * k, h = H * sv * k;
-      const fx = stx.value, fy = sty.value;
-      const dl = fx > 0 ? 0.25 * fx : fx, dr = fx > 0 ? fx : 0.25 * fx, dt = fy > 0 ? 0.25 * fy : fy, db = fy > 0 ? fy : 0.25 * fy;
-      l += dl; w += dr - dl; t += dt; h += db - dt;
-      u.panel.style.transform = `translate(${l.toFixed(2)}px, ${t.toFixed(2)}px) scale(${Math.max(0, w / W).toFixed(4)}, ${Math.max(0, h / H).toFixed(4)})`;
-      const e = smoothstep(0.2, 1, s);
-      u.panel.style.boxShadow = `0 ${(16 * e).toFixed(1)}px ${(44 * e).toFixed(1)}px rgb(0 0 0 / ${(0.16 * e).toFixed(3)}), 0 ${(2 * e).toFixed(1)}px ${(8 * e).toFixed(1)}px rgb(0 0 0 / ${(0.05 * e).toFixed(3)})`;
+      const e = clamp(s, 0, 1);
+      const PL = u.L + (W * (1 - k)) / 2, PT = u.T + (u.down ? 0 : H * (1 - k)), PW = W * k, PH = H * k;
+      const rl = lerp(u.tr.l, PL, e), rt = lerp(u.tr.t, PT, e), rw = lerp(u.tr.w, PW, e), rh = lerp(u.tr.h, PH, e);
+      const rr = lerp(Math.min(rw, rh) / 2, u.R * k, smoothstep(0.45, 1, e));
+      const full = e > 0.999 && k > 0.9999;
+      u.panel.style.clipPath = full ? '' : `inset(${(rt - u.T).toFixed(2)}px ${(u.L + W - rl - rw).toFixed(2)}px ${(u.T + H - rt - rh).toFixed(2)}px ${(rl - u.L).toFixed(2)}px round ${rr.toFixed(2)}px)`;
+      // content: scaled into the rect from its top-left, fading in from a light blur (s may overshoot a little)
+      const sc = Math.max(0.01, (rw / W) * (s > 1 ? s : 1));
+      u.body.style.transform = full && s < 1.0005 ? '' : `translate(${(rl - u.L).toFixed(2)}px, ${(rt - u.T).toFixed(2)}px) scale(${sc.toFixed(4)})`;
+      u.panel.style.boxShadow = full ? '0 16px 44px rgb(0 0 0 / .16), 0 2px 8px rgb(0 0 0 / .05)' : '';
       const op = smoothstep(0.35, 0.85, s);
       u.body.style.opacity = (op * lerp(1, MENU.dim, clamp(r0, 0, 1))).toFixed(3);
       u.body.style.filter = op < 0.999 ? `blur(${((1 - op) * 4).toFixed(2)}px)` : '';
       if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
-      // the drop: concentric with the panel, from the button's size to its resting size inside the panel
-      // it melts into the panel over the last part of the growth, so a menu at rest is the panel alone
-      const pc = Math.max(0, s), dd = Math.max(lerp(u.d0, u.D, Math.min(pc, 1)) * (1 - smoothstep(0.8, 1, pc)), 2);
-      const cx = u.L + u.ax + pc * (W / 2 - u.ax), cy = u.T + u.ay + pc * (H / 2 - u.ay);
-      u.drop.style.transform = `translate(${(cx - (u.L + W / 2)).toFixed(2)}px, ${(cy - (u.T + H / 2)).toFixed(2)}px) scale(${(dd / u.D).toFixed(4)})`;
-      // the capsule in the button's place gives way to the drop
-      u.proxy.style.transform = `scale(${lerp(1, 0.04, smoothstep(0.1, 0.6, s)).toFixed(4)})`;
-      if (u.grp) {
-        u.grp.tune({ veilOpacity: u.veil * smoothstep(0.15, 0.75, s), blur: lerp(1, u.blur, smoothstep(0, 0.7, s)), refraction: lerp(18, u.refr, smoothstep(0, 1, s)) });
-        u.grp.update();
-      } else u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
+      if (u.grp && u.grp.layer && u.lq) {
+        const q = u.lq, ly = u.grp.layer;
+        ly.style.clipPath = full ? '' : `inset(${(rt - q.top).toFixed(2)}px ${(q.right - rl - rw).toFixed(2)}px ${(q.bottom - rt - rh).toFixed(2)}px ${(rl - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
+        ly.style.opacity = smoothstep(0, 0.12, s).toFixed(3);
+      } else if (!u.grp) u.panel.style.opacity = smoothstep(0, 0.45, s).toFixed(3);
       // sub-menu cards, each its own glass in front of the level below
       u.cards.forEach((cd, i) => {
         const p = cd.p.value, pc2 = clamp(p, 0, 1.2), next = u.cards[i + 1], rn = next ? clamp(next.p.value, 0, 1.2) : 0; // a card under a deeper card only dims
@@ -1223,8 +1214,7 @@
       lv.surface.style.setProperty('--mx', ((x - q.left) / kx).toFixed(1) + 'px');
       lv.surface.style.setProperty('--my', ((y - q.top) / ky).toFixed(1) + 'px');
       if (glowA.target !== 1) glowA.animateTo(1, PRESS_GLOW);
-      if (ui.levels.length === 1 && !reduceMotion()) {
-        // stretch toward a finger held outside the menu (rest box, not the stretched one)
+      if (false) { // no stretch: the glass is drawn once and does not move (see render)
         const L = ui.L, T = ui.T, R = L + ui.W, B = T + ui.H;
         const ex = x < L ? x - L : x > R ? x - R : 0, ey = y < T ? y - T : y > B ? y - B : 0;
         stx.snapTo(rubber(ex, MENU.stretch)); sty.snapTo(rubber(ey, MENU.stretch));
