@@ -1317,7 +1317,9 @@
       const u = ui, lv = u.levels.length > 1 ? u.levels.pop() : null;
       if (!lv) return;
       const cd = lv.card;
-      light(null);
+      // the pill and the finger glow belong to the leaving card: drop them at once. A fade would be drawn on the
+      // level in front, which is now the menu, so its top row lit up for a few hundred ms
+      lit = null; hlA.op.snapTo(0); glowA.snapTo(0); lv.hl.style.opacity = '0'; lv.glow.style.opacity = '0';
       cd.popping = true; cd.el.style.pointerEvents = 'none'; // the leaving card never takes a tap meant for the menu
       lv.parent.host.style.pointerEvents = '';
       const done = () => {
