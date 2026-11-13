@@ -157,6 +157,28 @@ Group methods the menu relies on, also available for your own groups:
 | `observe: false` | no `ResizeObserver` on members (for members you resize yourself) |
 | `fadeIn: false` | no fade-in of the layer on creation |
 
+## Adaptive glass: the appearance follows what is behind it
+
+Small glass in iOS 26 (bars, buttons) is light with dark symbols over light content and darkens, with light symbols, over dark content. `LiquidUI.adapt(el, opts)` does this on the web.
+
+```js
+const bar = LiquidUI.blob([tabs.panel], { veil: '#FBFCFF', veilOpacity: 0.18 });
+LiquidUI.adapt(document.getElementById('tabbar'), {
+  base: '#FBFCFF',                                // the page colour where nothing else is (an element with pointer-events: none is not seen)
+  apply: (m) => bar.group.tune({ veil: m > 0.5 ? '#111A2E' : '#FBFCFF', veilOpacity: 0.18 + 0.14 * m }),
+  onMode: (mode) => tabs.retheme(mode === 'dark' ? '#8FB2FF' : '#1F3FBF'),
+});
+```
+
+```css
+#tabbar .lgu-tabs { color: color-mix(in srgb, #EEF2FC calc(var(--lg-dark, 0) * 100%), #20253A); }
+```
+
+- **How it sees the backdrop.** A page cannot read its own pixels, so the colour behind the element is estimated: at a grid of points (`grid: [3, 2]`, `inset: 4`) the stack of elements under the point (`document.elementsFromPoint`) is composited front to back from background colours, SVG fills and strokes and a fifth of the text colour; the element itself, glass layers, the menu and `[data-lg-ignore]` are skipped. Images, canvases and gradients are not read, so a photo behind the glass counts as its container's background colour.
+- **Switching.** Relative luminance below `dark` (0.28) makes the glass dark, above `light` (0.4) light, in between it keeps its state (no flicker at the threshold). `m` runs from 0 (light) to 1 (dark) on a spring (1, 0.35 s); the element gets `--lg-dark: m` for CSS, `apply(m)` runs every frame of the change, `onMode(mode)` once per switch.
+- **When.** On scroll, resize and every 700 ms, at most every 120 ms; `LiquidUI.adaptNow()` after a screen change. `LiquidUI.backdropColor(rect, self, opts)` returns the estimate itself.
+- **What to change.** A plain button: a dark surface over dark content (`glass.set({ surface: rgb(10 14 30 / 0.22 m) })`) and its text colour by `--lg-dark`. A bar: the group's veil colour and density (`group.tune({ veil, veilOpacity })`) and its labels. Tinted glass (the primary action) keeps its tint, as in iOS.
+
 ## Startup without a half-built screen
 
 At startup every glass element is built at once, and while the maps are computed the screen stays empty. Wrap the first render in `LiquidGlass.hold()` and `LiquidGlass.release()`: in between, `attach` and groups only queue the work, the screen with text paints at once, glass is built a frame later and group layers fade in over 0.22 s. Call `release()` after fonts are ready, otherwise the build takes the main thread and text appears after the shapes:

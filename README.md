@@ -30,7 +30,8 @@ Ask an agent for "liquid glass" and you usually get glassmorphism: a white haze 
 - **Real refraction on the web and in Android WebView.** Displacement maps computed from the same formulas as Kyant's Backdrop shader, applied through `backdrop-filter` with SVG filters. Lens, depth, dispersion, specular rim, inner and outer shadows.
 - **Merging glass**, like SwiftUI's `GlassEffectContainer`: nearby shapes melt into one drop with a smooth bridge and split again. One filter for the whole group, tuned to stay cheap on phones.
 - **iOS 26 interaction.** Buttons stretch toward the finger on a rubber band and bounce back, thumbs inflate into lenses and stretch at speed, the tab bar drop magnifies its item and shows neighbours at its rim. Menus grow out of their button as one drop and are picked with a single hold, slide and lift, on springs measured from UIKit.
-- **Ready components:** button, toggle, slider, tab bar, magnifier, pull-down and pop-up menus with sub-menus, merge groups. Keyboard and ARIA roles included; respects reduced transparency, contrast and motion.
+- **Ready components:** button, toggle, slider, tab bar, magnifier, pull-down and pop-up menus with sub-menus, merge groups.
+- **Adaptive glass:** bars and buttons turn dark with light symbols over dark content and back over light content, as in iOS 26. Keyboard and ARIA roles included; respects reduced transparency, contrast and motion.
 - **Fast startup:** `hold()` / `release()` paints text first and builds glass a frame later; a splash recipe that never stutters.
 - **Graceful fallback:** Safari and Firefox get a soft blur with the same highlights, shadows and springs instead of a broken hole.
 - **Jetpack Compose:** how to use Kyant's Backdrop library correctly, with recipe values from its catalog.

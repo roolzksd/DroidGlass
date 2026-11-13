@@ -1411,8 +1411,128 @@
     };
   }
 
+
+  // ---------- adaptive glass: the appearance follows what is behind it (iOS 26) ----------
+  // Small glass (bars, buttons) switches between a light and a dark appearance by the brightness of the content
+  // behind it, like iOS: over light content the glass is clear with dark symbols, over dark content it darkens and
+  // its symbols turn light. The colours of the backdrop already come through the glass by refraction.
+  // A page cannot read its own pixels, so the backdrop is estimated from the elements behind the glass: a grid of
+  // points, at each the stack of elements under it (document.elementsFromPoint) is composited front to back from
+  // their background colours, SVG fills and strokes, and a share of their text colour. Images, canvases and
+  // gradients are not read; elements with pointer-events: none are not seen (give `base` for such a page colour).
+  // The estimate runs on scroll, resize and every 700 ms, at most every 120 ms. A dead band (hysteresis) keeps the
+  // glass from flickering at the threshold, and the switch rides a spring, so the change is smooth.
+  const ADAPT_SPRING = spring(1, Math.pow((2 * Math.PI) / 0.35, 2), 0.002);
+  const adaptees = new Set();
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const luminance = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  function cssColor(v) {
+    if (!v || v === 'none' || v === 'transparent' || v.startsWith('url')) return null;
+    let m = v.match(/^rgba?\(([^)]+)\)/);
+    if (m) { const n = m[1].split(/[\s,/]+/).filter(Boolean).map(parseFloat); return [n[0], n[1], n[2], n[3] ?? 1]; }
+    m = v.match(/^color\(srgb ([^)]+)\)/);
+    if (m) { const n = m[1].split(/[\s/]+/).filter(Boolean).map(parseFloat); return [n[0] * 255, n[1] * 255, n[2] * 255, n[3] ?? 1]; }
+    if (v[0] === '#') return hex(v.length === 4 ? '#' + [...v.slice(1)].map((x) => x + x).join('') : v);
+    return null;
+  }
+  // the paint one element puts at a point: background, or an SVG shape's fill or stroke, or a share of its text
+  function paintOf(el, cache) {
+    if (cache.has(el)) return cache.get(el);
+    let c = null;
+    const cs = getComputedStyle(el), op = parseFloat(cs.opacity);
+    if (cs.visibility === 'hidden' || op === 0) { cache.set(el, null); return null; }
+    if (root.SVGGraphicsElement && el instanceof SVGGraphicsElement && !(el instanceof SVGSVGElement)) {
+      const f = cssColor(cs.fill), st = cssColor(cs.stroke);
+      if (f && (el.tagName !== 'text')) c = [f[0], f[1], f[2], f[3] * (parseFloat(cs.fillOpacity) || 1)];
+      else if (st) c = [st[0], st[1], st[2], st[3] * (parseFloat(cs.strokeOpacity) || 1) * 0.6];
+      else if (f) c = [f[0], f[1], f[2], f[3] * 0.25];
+    } else {
+      const bg = cssColor(cs.backgroundColor);
+      if (bg && bg[3] > 0.01) c = bg;
+      else {
+        // text: its colour covers a share of the line
+        let txt = false;
+        for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { txt = true; break; }
+        const fg = txt && cssColor(cs.color);
+        if (fg) c = [fg[0], fg[1], fg[2], fg[3] * 0.2];
+      }
+    }
+    if (c && op < 1) c = [c[0], c[1], c[2], c[3] * op];
+    cache.set(el, c);
+    return c;
+  }
+  // average colour of what lies behind a rectangle, the element `self` and other glass excluded
+  function backdropColor(rect, self, o = {}) {
+    const [gx, gy] = o.grid || [3, 2], inset = o.inset ?? 4, cache = new Map(), sum = [0, 0, 0];
+    const base = (o.base && cssColor(typeof o.base === 'function' ? o.base() : o.base)) ||
+      cssColor(getComputedStyle(document.body).backgroundColor) || cssColor(getComputedStyle(document.documentElement).backgroundColor) || [255, 255, 255, 1];
+    const skip = (el) => el === self || (self && self.contains(el)) || (el.closest && el.closest('.lg-group, .lgu-menu-layer, [data-lg-ignore]'));
+    let n = 0;
+    for (let i = 0; i < gx; i++) for (let j = 0; j < gy; j++) {
+      const x = rect.left + inset + ((rect.width - 2 * inset) * (i + 0.5)) / gx, y = rect.top + inset + ((rect.height - 2 * inset) * (j + 0.5)) / gy;
+      if (x < 0 || y < 0 || x >= root.innerWidth || y >= root.innerHeight) continue;
+      const acc = [0, 0, 0]; let a = 0;
+      for (const el of document.elementsFromPoint(x, y)) {
+        if (skip(el)) continue;
+        const c = paintOf(el, cache);
+        if (!c) continue;
+        const w = (1 - a) * c[3];
+        acc[0] += w * c[0]; acc[1] += w * c[1]; acc[2] += w * c[2]; a += w;
+        if (a > 0.985) break;
+      }
+      const w = 1 - a;
+      sum[0] += acc[0] + w * base[0]; sum[1] += acc[1] + w * base[1]; sum[2] += acc[2] + w * base[2]; n++;
+    }
+    return n ? [sum[0] / n, sum[1] / n, sum[2] / n, 1] : base;
+  }
+  let adaptT = 0, adaptLast = 0, adaptTimer = 0;
+  function adaptNow() {
+    adaptLast = performance.now();
+    for (const a of Array.from(adaptees)) {
+      if (!a.el.isConnected) { a.destroy(); continue; }
+      const r = a.el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const c = backdropColor(r, a.el, a.o), L = luminance(c);
+      a.color = c; a.lum = L;
+      // dead band: dark below o.dark, light above o.light, otherwise keep
+      const mode = L < a.o.dark ? 'dark' : L > a.o.light ? 'light' : (a.mode || (L < (a.o.dark + a.o.light) / 2 ? 'dark' : 'light'));
+      if (mode !== a.mode) {
+        const first = a.mode == null;
+        a.mode = mode;
+        if (first || reduceMotion()) a.anim.snapTo(mode === 'dark' ? 1 : 0); else a.anim.animateTo(mode === 'dark' ? 1 : 0, ADAPT_SPRING);
+        if (a.o.onMode) a.o.onMode(mode, a);
+      }
+    }
+  }
+  function adaptSoon() {
+    if (adaptT) return;
+    const wait = Math.max(0, 120 - (performance.now() - adaptLast));
+    adaptT = setTimeout(() => { adaptT = 0; adaptNow(); }, wait);
+  }
+  function adaptListen(on) {
+    const f = on ? 'addEventListener' : 'removeEventListener';
+    root[f]('scroll', adaptSoon, { capture: true, passive: true });
+    root[f]('resize', adaptSoon);
+    if (on) adaptTimer = setInterval(() => { if (!document.hidden) adaptNow(); }, 700); else clearInterval(adaptTimer);
+  }
+  // el: the glass element; opts: { apply(m, a), onMode(mode, a), dark: 0.28, light: 0.4, grid: [3, 2], inset: 4, base }
+  // m runs 0 (light content behind) to 1 (dark content behind) on a spring; the element also gets --lg-dark = m,
+  // for CSS such as color: color-mix(in srgb, white calc(var(--lg-dark) * 100%), black)
+  function adapt(el, opts) {
+    const o = Object.assign({ apply: null, onMode: null, dark: 0.28, light: 0.4, grid: [3, 2], inset: 4, base: null }, opts);
+    const a = { el, o, mode: null, lum: null, color: null };
+    const draw = () => { const m = a.anim.value; el.style.setProperty('--lg-dark', m.toFixed(3)); if (o.apply) o.apply(m, a); };
+    a.anim = new Anim(0, () => invalidate(draw));
+    a.destroy = () => { adaptees.delete(a); el.style.removeProperty('--lg-dark'); if (!adaptees.size) adaptListen(false); };
+    if (!adaptees.size) adaptListen(true);
+    adaptees.add(a);
+    adaptNow(); draw();
+    return { get mode() { return a.mode; }, get luminance() { return a.lum; }, get color() { return a.color; }, get value() { return a.anim.value; }, destroy: a.destroy };
+  }
+
   root.LiquidUI = {
     button, toggle, slider, tabs, magnifier, menu, blob, autoMerge, recolor, sweep, refreshTouch,
+    adapt, adaptNow, backdropColor,
     spring, Anim, DampedDrag, PressGlow, VelocityTracker, gesture, invalidate, rubber, onMotion, notify,
   };
 })(window);
