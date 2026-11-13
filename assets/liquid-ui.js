@@ -899,7 +899,11 @@
 
   function menu(trigger, opts) {
     const fine = !!(root.matchMedia && root.matchMedia('(pointer: fine)').matches);
-    const o = Object.assign({ items: [], layout: 'large', onSelect: null, onOpen: null, onClose: null, onHighlight: null, minWidth: 250, maxWidth: 320, radius: fine ? 22 : 32, glass: null, motion: 'morph', gap: MENU.grow.gap }, opts);
+    const o = Object.assign({ items: [], layout: 'large', onSelect: null, onOpen: null, onClose: null, onHighlight: null, minWidth: 250, maxWidth: 320, radius: fine ? 22 : 32, glass: null, motion: 'morph', gap: MENU.grow.gap, size: 'regular' }, opts);
+    // size 'compact': 36 px rows with 15 px text, 6 px insets, 200 px wide, radius 22: a smaller menu for dense screens
+    const compact = o.size === 'compact', given = opts || {};
+    if (compact) { if (given.minWidth == null) o.minWidth = 200; if (given.radius == null) o.radius = fine ? 18 : 22; }
+    const inset = compact ? 6 : MENU.inset;
     const id = 'lgu-menu-' + ++menuUid;
     const G = MENU.grow;
     if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { stretch: false, press: o.motion === 'grow' ? 'shrink' : 'grow' });
@@ -952,7 +956,7 @@
     // ---------- build ----------
     function build() {
       const dk = dark(), T = trigger.getBoundingClientRect();
-      const layer = document.createElement('div'); layer.className = 'lgu-menu-layer' + (dk ? ' lgu-dark' : '');
+      const layer = document.createElement('div'); layer.className = 'lgu-menu-layer' + (dk ? ' lgu-dark' : '') + (compact ? ' lgu-compact' : '');
       const catcher = document.createElement('div'); catcher.className = 'lgu-menu-catch';
       const sf = mkSurface(''), panel = sf.el, body = sf.body;
       panel.id = id;
@@ -1223,7 +1227,7 @@
       const jump = !was || hlA.op.value < 0.05;
       for (const [a, v] of [[hlA.x, x], [hlA.y, y], [hlA.w, w], [hlA.h, h]]) { if (jump) a.snapTo(v); else a.animateTo(v, MENU.track); }
       // concentric with the menu's corners (a capsule for one-line rows); cells keep their own radius
-      level().hl.style.borderRadius = (r.cell ? getComputedStyle(el).borderRadius : Math.min(Math.max(level().R - MENU.inset, 8), h / 2) + 'px');
+      level().hl.style.borderRadius = (r.cell ? getComputedStyle(el).borderRadius : Math.min(Math.max(level().R - inset, 8), h / 2) + 'px');
       hlA.op.animateTo(1, MENU.fade);
       if (press && o.onHighlight) o.onHighlight(r.item); // a tick per row under the finger, as UIKit plays
     }
@@ -1258,7 +1262,7 @@
     // past the menu's bottom when it needs to, down to the screen's margin. The header, a tap on the menu behind,
     // Left or Escape go back.
     function openSub(r) {
-      const u = ui, parent = level(), m = MENU.margin, pad = MENU.inset;
+      const u = ui, parent = level(), m = MENU.margin, pad = inset;
       const wrap = document.createElement('div'); wrap.className = 'lgu-menu-subwrap';
       const sf = mkSurface('lgu-menu-card'), el = sf.el, body = sf.body;
       el.setAttribute('aria-label', r.item.label);

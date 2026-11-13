@@ -144,6 +144,7 @@ LiquidUI.menu(document.getElementById('more'), {
 - **Closes** on scroll outside the menu, on resize and on the wheel.
 - **Fallback:** without refraction (Safari, Firefox, reduced transparency) the panel is frosted glass, with the same gestures and springs. With reduced motion the menu fades in and out.
 - **Mouse:** on `pointer: fine` rows are 36 px with 15 px text instead of 44 px and 17 px.
+- **`size: 'compact'`:** a smaller menu for dense screens: 200 px wide, radius 22, rows of 36 px with 15 px text (second lines 12 px), 20 px icons, 6 px insets, separators with 4 px above and below. The iOS metrics stay the default.
 - **Cost:** one group with one member while the menu is open, plus one per open sub-menu card. Per frame the script only writes two clip paths and a transform; the filter is never touched during motion.
 
 ### `motion: 'grow'`: the menu grows from under its button

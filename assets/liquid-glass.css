@@ -145,6 +145,16 @@
 .lgu-menu-row.lgu-small .lgu-menu-item { min-height: 52px; }
 /* a sub-menu card is its own glass in front of the menu; the wrapper holds its glass layer under it */
 .lgu-menu-subwrap { position: absolute; inset: 0; pointer-events: none; }
+/* size 'compact' */
+.lgu-compact .lgu-menu-body { padding: 6px; }
+.lgu-compact .lgu-menu-item { min-height: 36px; padding: 0 12px; gap: 8px; font-size: 15px; border-radius: 16px; }
+.lgu-compact .lgu-menu-item:has(.lgu-mi-sub) { padding-top: 4px; padding-bottom: 4px; }
+.lgu-compact .lgu-menu-item .lgu-mi-sub { font-size: 12px; line-height: 1.2; }
+.lgu-compact .lgu-menu-item .lgu-mi-icon { width: 20px; height: 20px; font-size: 17px; }
+.lgu-compact .lgu-menu-item .lgu-mi-check { width: 16px; }
+.lgu-compact .lgu-menu-item .lgu-mi-check svg, .lgu-compact .lgu-menu-item .lgu-mi-chev svg { width: 14px; height: 14px; }
+.lgu-compact .lgu-menu-sep { margin: 4px 12px; }
+.lgu-compact .lgu-menu-row .lgu-menu-item { min-height: 58px; font-size: 11px; border-radius: 16px; }
 @media (pointer: fine) {
   .lgu-menu-item { min-height: 36px; font-size: 15px; border-radius: 18px; }
   .lgu-menu-sep { margin: 6px 16px; }
