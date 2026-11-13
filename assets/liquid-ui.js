@@ -667,7 +667,12 @@
     invalidate(render);
     // in a merge group the group draws the bar body: panel and row-copy glass switch off, the panel window stays
     panel.__lgGhost = (on) => { pg.set({ ghost: on }); ag.set({ ghost: on }); };
-    return { panel, glass: pg, get index() { return current; }, set index(i) { select(i, false); }, destroy() { off(); pg.destroy(); ag.destroy(); sg.destroy(); } };
+    return {
+      panel, glass: pg, get index() { return current; }, set index(i) { select(i, false); },
+      // after a theme change: the bar's surface and the accent colour, no rebuild
+      retheme(accentColor) { if (accentColor) o.accent = accentColor; pg.set({ surface: THEME.container() }); accent.style.color = o.accent || THEME.blue(); },
+      destroy() { off(); pg.destroy(); ag.destroy(); sg.destroy(); },
+    };
   }
 
   // ---------- Magnifier (MagnifierContent): lens 128x96, zoom 1.5, depth, dispersion, inner shadow ----------
@@ -742,6 +747,10 @@
     api.update = update; api.destroy = destroy;
     blobs.add(api);
     return api;
+  }
+  // after a theme change: groups take their members' new tints (set the members' own glass first)
+  function recolor() {
+    for (const b of blobs) for (const el of b.members) { const h = LG.of(el), m = h ? h.material() : null; if (m && m.tint) b.group.tint(el, m.tint); }
   }
   // remove groups whose member has left the document
   function sweep() { for (const b of Array.from(blobs)) if (!b.members.every((e) => e.isConnected)) b.destroy(); }
@@ -889,6 +898,9 @@
       const v = parseFloat(getComputedStyle(trigger).borderTopLeftRadius) || 0;
       return v >= Math.min(r.width, r.height) / 2 - 0.5 ? 'capsule' : v;
     }
+    // o.glass may be a function, read on every open and on retheme(): colours that follow the page's theme
+    const glassOpts = () => (typeof o.glass === 'function' ? o.glass() : o.glass) || {};
+    const freshItems = () => (typeof o.items === 'function' ? o.items() : o.items);
     const refracts = () => LG.canRefract() && !(root.matchMedia && root.matchMedia('(prefers-reduced-transparency: reduce)').matches);
     function mkSurface(cls) {
       const el = document.createElement('div'); el.className = 'lgu-menu' + (cls ? ' ' + cls : '');
@@ -914,7 +926,7 @@
       panel.id = id;
       if (trigger.id) panel.setAttribute('aria-labelledby', trigger.id); else if (trigger.getAttribute('aria-label')) panel.setAttribute('aria-label', trigger.getAttribute('aria-label'));
       layer.append(catcher, panel); document.body.appendChild(layer);
-      const lvl = menuRows(body, typeof o.items === 'function' ? o.items() : o.items, o.layout, null); // a function: items with fresh state on every open
+      const lvl = menuRows(body, freshItems(), o.layout, null); // a function: items with fresh state on every open
       // size: natural width within limits, height up to the screen; long menus scroll
       panel.style.width = 'max-content';
       const m = MENU.margin, W = Math.round(clamp(panel.offsetWidth, o.minWidth, Math.min(o.maxWidth, vw() - 2 * m)));
@@ -931,7 +943,7 @@
       const tr = triggerRadius(T);
       const refract = refracts();
       let grp = null;
-      const g = Object.assign(menuGlass(dk), o.glass || {}), target = { veil: g.veilOpacity, blur: g.blur, refr: g.refraction };
+      const g = Object.assign(menuGlass(dk), glassOpts()), target = { veil: g.veilOpacity, blur: g.blur, refr: g.refraction };
       if (refract) {
         // the glass is drawn once at the menu's full size and never moves; the entrance is a clip (see render)
         grp = LG.group(layer, g);
@@ -1104,6 +1116,14 @@
       const it = r.item;
       if (it.back) { closeSub(); return; }
       if (it.submenu) { openSub(r); return; }
+      // keepOpen (UIMenu's keepsMenuPresented): a switch or a choice that applies at once; the rows show the new state
+      if (it.keepOpen) {
+        if (it.onSelect) it.onSelect(it);
+        if (o.onSelect) o.onSelect(it);
+        refreshRows();
+        if (!kbd) light(null); // the pill leaves the row once it has done its job
+        return;
+      }
       close({ focus: kbd });
       if (it.onSelect) it.onSelect(it);
       if (o.onSelect) o.onSelect(it);
@@ -1155,7 +1175,7 @@
       } else el.classList.add('lgu-menu--frost');
       cd.p = new Anim(0, inv);
       u.cards.push(cd);
-      const lv = { host: body, surface: el, glow: sf.glow, rows: lvl.rows, hl: lvl.hl, R, card: cd, parent };
+      const lv = { host: body, surface: el, glow: sf.glow, rows: lvl.rows, hl: lvl.hl, R, card: cd, parent, src: parent.rows.filter((x) => !x.item.back).indexOf(r) };
       parent.hl.style.opacity = '0'; lit = null; hlA.op.snapTo(0);
       parent.host.style.pointerEvents = 'none';
       u.levels.push(lv);
@@ -1185,6 +1205,45 @@
       else { cd.p.animateTo(0, MENU.back); until(() => cd.p.value < 0.01 || ui !== u).then(done); }
       level().surface.focus({ preventScroll: true });
       if (kbd) setTimeout(() => focusRow(0), 0);
+    }
+
+    // ---------- live state: rows after a keepOpen action, colours after a theme change ----------
+    // Items are read again (o.items as a function) and matched to the rows by order; checks, icons, second lines
+    // and labels change in place, nothing moves.
+    function refreshRows() {
+      if (!ui) return;
+      let items = normItems(freshItems()).filter((x) => !x.separator);
+      for (let li = 0; li < ui.levels.length && items; li++) {
+        const lv = ui.levels[li];
+        if (li > 0) { const src = items[lv.src]; items = src && src.submenu ? normItems(src.submenu).filter((x) => !x.separator) : null; if (!items) break; }
+        lv.rows.filter((r) => !r.item.back).forEach((r, i) => {
+          const it = items[i];
+          if (!it) return;
+          it.__checks = r.item.__checks;
+          r.item = it; r.enabled = !it.disabled;
+          const ck = r.el.querySelector('.lgu-mi-check');
+          if (ck) ck.innerHTML = it.checked ? MENU_ICONS.check : '';
+          if (it.checked != null) r.el.setAttribute('aria-checked', String(!!it.checked));
+          const ic = r.el.querySelector('.lgu-mi-icon');
+          if (ic && it.icon != null && ic.innerHTML !== it.icon) ic.innerHTML = it.icon;
+          const lab = r.el.querySelector('.lgu-mi-label');
+          if (lab) {
+            if (lab.firstChild && lab.firstChild.nodeType === 3 && lab.firstChild.nodeValue !== it.label) lab.firstChild.nodeValue = it.label;
+            const sm = lab.querySelector('.lgu-mi-sub');
+            if (sm && it.sub != null) sm.textContent = it.sub;
+          }
+        });
+      }
+    }
+    // the page's theme changed while the menu is open: ink and highlight follow the class, the glass its new veil
+    function retheme() {
+      if (!ui) return;
+      const dk = dark(), g = Object.assign(menuGlass(dk), glassOpts());
+      ui.dk = dk; ui.layer.classList.toggle('lgu-dark', dk);
+      ui.veil = g.veilOpacity; ui.g = Object.assign(ui.g || {}, g);
+      if (ui.grp) ui.grp.tune({ veil: g.veil, veilOpacity: g.veilOpacity });
+      for (const cd of ui.cards) { cd.veil = Math.min(0.92, g.veilOpacity + 0.14); if (cd.grp) cd.grp.tune({ veil: g.veil, veilOpacity: cd.veil }); }
+      refreshRows();
     }
 
     // ---------- gestures ----------
@@ -1342,6 +1401,7 @@
       get depth() { return ui ? ui.levels.length - 1 : 0; },
       back() { if (ui && ui.levels.length > 1) { closeSub(); return true; } return false; },
       setItems(items) { o.items = items; if (state === 'open') close({ instant: true }); },
+      refresh: () => refreshRows(), retheme: () => retheme(),
       destroy() {
         close({ instant: true }); untrack();
         trigger.removeEventListener('pointerdown', onTriggerDown); trigger.removeEventListener('keydown', onTriggerKey, true);
@@ -1352,7 +1412,7 @@
   }
 
   root.LiquidUI = {
-    button, toggle, slider, tabs, magnifier, menu, blob, autoMerge, sweep, refreshTouch,
+    button, toggle, slider, tabs, magnifier, menu, blob, autoMerge, recolor, sweep, refreshTouch,
     spring, Anim, DampedDrag, PressGlow, VelocityTracker, gesture, invalidate, rubber, onMotion, notify,
   };
 })(window);

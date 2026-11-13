@@ -583,6 +583,13 @@
       else fallbackFilter(G);
     }
     if ('surface' in p && p.surface !== s.surface) { s.surface = p.surface; paintSurface(G); }
+    // tint colour of tinted glass (a theme change): the hue flood and the surface under it, no rebuild
+    if ('tint' in p && p.tint && G.o.tint && p.tint !== G.o.tint) {
+      G.o.tint = p.tint;
+      const f = G.filter && G.filter.querySelector('feFlood[result="tc"]');
+      if (f) f.setAttribute('flood-color', p.tint);
+      paintSurface(G);
+    }
     if ('highlightAlpha' in p && G.canvas) G.canvas.style.opacity = p.highlightAlpha;
     if ('angle' in p && p.angle !== s.angle) { s.angle = p.angle; drawHighlight(G); }
     let sh = false;
@@ -927,8 +934,18 @@
       // drawing an old frame of a live group after its pictures moved); cheap once, not for every frame
       refresh() { if (!box) return; layer.style.backdropFilter = layer.style.webkitBackdropFilter = 'none'; void layer.offsetWidth; layer.style.backdropFilter = layer.style.webkitBackdropFilter = `url(#${id})`; update(); },
       set(p) { Object.assign(o, p); for (const mb of members) mb.sUrl = null; build(); },
+      // a member's tint changed (a theme change): repaint its flood, no rebuild
+      tint(el, color) {
+        const i = members.findIndex((m) => m.el === el);
+        if (i < 0 || !members[i].tint || !color) return api;
+        members[i].tint = color;
+        const f = filter && filter.querySelector(`feFlood[result="tc${i}"]`);
+        if (f) f.style.floodColor = color;
+        return api;
+      },
       // cheap per-frame changes of the material, no rebuild: veil density, backdrop blur, refraction depth
       tune(p) {
+        if (p.veil && knobs.veil) { o.veil = p.veil; knobs.veil.style.floodColor = p.veil; } // veil colour (a theme change)
         if (p.veilOpacity != null) { o.veilOpacity = p.veilOpacity; if (knobs.veil) sa(knobs.veil, 'flood-opacity', p.veilOpacity.toFixed(3)); }
         if (p.blur != null && knobs.blur) { o.blur = Math.max(0.01, p.blur); sa(knobs.blur, 'stdDeviation', o.blur.toFixed(2)); }
         if (p.refraction != null) { o.refraction = p.refraction; if (knobs.disp) sa(knobs.disp, 'scale', (p.refraction / 0.46).toFixed(2)); }
