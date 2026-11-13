@@ -1049,7 +1049,7 @@
       const op = smoothstep(0.35, 0.85, s);
       u.body.style.opacity = (op * lerp(1, MENU.dim, clamp(r0, 0, 1))).toFixed(3);
       u.body.style.filter = op < 0.999 ? `blur(${((1 - op) * 4).toFixed(2)}px)` : '';
-      if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
+      if (c0) for (const row of c0.covered) row.style.opacity = coverOp(c0).toFixed(3);
       if (u.grp && u.grp.layer && u.lq) {
         const q = u.lq, ly = u.grp.layer;
         ly.style.clipPath = full ? '' : `inset(${(rt - q.top).toFixed(2)}px ${(q.right - rl - rw).toFixed(2)}px ${(q.bottom - rt - rh2).toFixed(2)}px ${(rl - q.left).toFixed(2)}px round ${rr.toFixed(2)}px)`;
@@ -1087,7 +1087,7 @@
         u.rim.style.transform = tf;
         u.rim.style.opacity = (glassOp * (1 - smoothstep(0.96, 1, S))).toFixed(3);
       }
-      if (c0) for (const row of c0.covered) row.style.opacity = (1 - smoothstep(0, 0.3, r0)).toFixed(3);
+      if (c0) for (const row of c0.covered) row.style.opacity = coverOp(c0).toFixed(3);
       if (u.grp && u.grp.layer && u.lq) {
         const q = u.lq, ly = u.grp.layer;
         if (inside) {
@@ -1103,6 +1103,10 @@
         ly.style.opacity = glassOp.toFixed(3);
       } else if (!u.grp) u.panel.style.opacity = glassOp.toFixed(3);
     }
+    // rows of the level below that a card covers: they leave fast as the card arrives and come back as exactly the
+    // inverse of the card's text when it leaves (a cross-fade). Waiting for the card's spring to settle left the
+    // place empty, bare tinted glass, for about 150 ms after the card had faded
+    const coverOp = (cd) => { const p = clamp(cd.p.value, 0, 1.2); return cd.popping ? smoothstep(0, 0.3, 1 - p) : 1 - smoothstep(0, 0.3, p); };
     function renderCards(u) {
       // sub-menu cards, each its own glass in front of the level below
       u.cards.forEach((cd, i) => {
@@ -1117,7 +1121,7 @@
         const glass = cd.popping ? 1 - smoothstep(0, 0.32, 1 - p) : smoothstep(0, 0.2, p);
         const text = cd.popping ? 1 - smoothstep(0, 0.3, 1 - p) : smoothstep(0, 0.3, p);
         cd.body.style.opacity = (text * lerp(1, MENU.dim, clamp(rn, 0, 1))).toFixed(3);
-        if (next) for (const row of next.covered) row.style.opacity = (1 - smoothstep(0, 0.3, rn)).toFixed(3);
+        if (next) for (const row of next.covered) row.style.opacity = coverOp(next).toFixed(3);
         // no shadow under a sub-menu card: nothing shows one in iOS (the card is just denser glass over the menu)
         if (cd.grp && cd.grp.layer) {
           const ly = cd.grp.layer, q = cd.lq;
