@@ -646,7 +646,7 @@
   const copyText = (t) => (navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied'), () => toast('Copy failed'));
   const setAnim = (on) => { animT.checked = on; sceneEls.forEach((s) => s.classList.toggle('anim', on)); };
   const setTags = (show) => { document.body.classList.toggle('notags', !show); store.set('notags', !show); tagsT.checked = show; };
-  LiquidUI.button($('more'), { stretch: false });
+  LiquidUI.button($('more'));
   LiquidUI.menu($('more'), {
     layout: 'medium',
     items: () => [
@@ -664,7 +664,7 @@
     ],
   });
   // a pop-up button: the menu shows the choices, the button shows the current one
-  LiquidUI.button($('pop'), { stretch: false });
+  LiquidUI.button($('pop'));
   LiquidUI.menu($('pop'), {
     items: () => {
       const cur = presetName();
@@ -674,7 +674,7 @@
   });
 
   // motion 'grow': the menu grows from under the button, curves measured on a native Android menu
-  LiquidUI.button($('more2'), { stretch: false, press: 'shrink' });
+  LiquidUI.button($('more2'), { press: 'shrink' });
   LiquidUI.menu($('more2'), {
     motion: 'grow',
     items: () => [

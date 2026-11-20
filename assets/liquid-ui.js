@@ -319,6 +319,8 @@
     const noMenu = (e) => e.preventDefault();
     el.addEventListener('contextmenu', noMenu);
     el.__lgGhost = (on) => glass.set({ ghost: on }); // a merge group takes over drawing the glass
+    // a menu opening from this button takes the finger over: the stretch springs back, the slide goes to the rows
+    el.__lgLetGo = () => { if (start) { release(); start = null; } };
     const glow = new PressGlow(() => invalidate(render));
     // press 'shrink': the button sinks to 0.92 under the finger and springs back with a slight overshoot
     // (measured on a native Android menu button: 0.92 in about 80 ms, back in about 180 ms, +1 %)
@@ -398,7 +400,7 @@
     if (o.onClick) el.addEventListener('click', o.onClick);
     return {
       glass,
-      destroy() { off(); stretchy.delete(el); el.removeEventListener('contextmenu', noMenu); el.removeEventListener('keydown', onKey); el.removeEventListener('click', onClickCapture, true); el.classList.remove('lg-stretch'); delete el.__lgPull; delete el.__lgGhost; glass.destroy(); },
+      destroy() { off(); stretchy.delete(el); delete el.__lgLetGo; el.removeEventListener('contextmenu', noMenu); el.removeEventListener('keydown', onKey); el.removeEventListener('click', onClickCapture, true); el.classList.remove('lg-stretch'); delete el.__lgPull; delete el.__lgGhost; glass.destroy(); },
     };
   }
 
@@ -909,7 +911,8 @@
     const inset = compact ? 6 : MENU.inset;
     const id = 'lgu-menu-' + ++menuUid;
     const G = MENU.grow;
-    if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { stretch: false, press: o.motion === 'grow' ? 'shrink' : 'grow' });
+    // the trigger stretches toward the finger like any glass button until the menu opens (see __lgLetGo)
+    if (!LG.of(trigger) && !trigger.__lgBlob) button(trigger, { press: o.motion === 'grow' ? 'shrink' : 'grow' });
     trigger.setAttribute('aria-haspopup', 'menu'); trigger.setAttribute('aria-expanded', 'false');
     trigger.style.touchAction = 'none'; // a held finger slides from the button into the menu: the browser must not take it for a scroll
     trigger.style.webkitTouchCallout = 'none';
@@ -1145,6 +1148,7 @@
     function open(how = {}) {
       if (state !== 'closed') return;
       state = 'open'; openedAt = performance.now(); kbd = !!how.keyboard; lit = null;
+      if (trigger.__lgLetGo) trigger.__lgLetGo(); // the button stops following the finger: the menu has it now
       build();
       const u = ui;
       trigger.setAttribute('aria-expanded', 'true'); trigger.setAttribute('aria-controls', id);

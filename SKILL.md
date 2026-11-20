@@ -88,7 +88,7 @@ Copy the three files from `assets/` into the project unchanged and configure the
       { label: 'Delete', role: 'destructive', onSelect: () => {} }],
   });
   // or grown from under the button, as native Android menus do (curves measured frame by frame); the button sinks under the finger
-  // LiquidUI.button(btn, { stretch: false, press: 'shrink' }); LiquidUI.menu(btn, { motion: 'grow', items: [...] });
+  // LiquidUI.button(btn, { press: 'shrink' }); LiquidUI.menu(btn, { motion: 'grow', items: [...] });
   // size: 'compact' gives a smaller menu (36 px rows, 15 px text, 200 px wide) when the iOS metrics feel too big
   // merging: a bar and a button next to it melt into one drop; neighbouring stretchy buttons do it by themselves
   // LiquidUI.blob([tabs.panel, fab], { blur: 3.5 }); LiquidUI.autoMerge(document.body); after a screen change LiquidUI.sweep()
